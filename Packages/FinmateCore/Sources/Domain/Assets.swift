@@ -10,16 +10,20 @@ import Shared
 // Money is Int64 minor units; Decimal is used only for conversion/share math.
 
 public enum AssetType: String, Codable, Sendable, CaseIterable, Hashable {
-    case crypto, stock, etf, cash, other
+    case crypto, stock, etf, cash, savings
+    case realEstate = "real_estate"
+    case other
 
     /// Human label for UI/legends.
     public var displayName: String {
         switch self {
-        case .crypto: return "Crypto"
-        case .stock:  return "Stock"
-        case .etf:    return "ETF"
-        case .cash:   return "Cash"
-        case .other:  return "Other"
+        case .crypto:     return "Crypto"
+        case .stock:      return "Stock"
+        case .etf:        return "ETF"
+        case .cash:       return "Cash"
+        case .savings:    return "Savings"
+        case .realEstate: return "Real estate"
+        case .other:      return "Other"
         }
     }
 }

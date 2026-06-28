@@ -4,31 +4,18 @@ import Domain
 import Shared
 
 // MARK: - Asset type mapping (docs/05 §3.7 schema vs. Domain AssetType)
-// Schema CHECK: stock | crypto | savings | real_estate | other
-// Domain:       crypto | stock | etf | cash | other
-// ETF/cash have no exact column value, so they map to the closest legal value and
-// back; the round-trip is lossy for those two (documented; runtime fidelity is out
-// of scope for this compile-verified layer).
+// Canonical UNION set (ADR-0023, migration 20260628001000): schema CHECK and
+// Domain AssetType now agree exactly:
+//   crypto | stock | etf | cash | savings | real_estate | other
+// The mapping is a lossless 1:1 round-trip across all 7 cases. The only
+// camelCase↔snake_case rename is realEstate ↔ "real_estate"; every other case's
+// rawValue already equals its column value.
 
 private enum AssetTypeMapping {
-    static func toColumn(_ type: AssetType) -> String {
-        switch type {
-        case .crypto: return "crypto"
-        case .stock:  return "stock"
-        case .etf:    return "other"
-        case .cash:   return "savings"
-        case .other:  return "other"
-        }
-    }
+    static func toColumn(_ type: AssetType) -> String { type.rawValue }
 
     static func toDomain(_ column: String) -> AssetType {
-        switch column {
-        case "crypto":      return .crypto
-        case "stock":       return .stock
-        case "savings":     return .cash
-        case "real_estate": return .other
-        default:            return .other
-        }
+        AssetType(rawValue: column) ?? .other
     }
 }
 

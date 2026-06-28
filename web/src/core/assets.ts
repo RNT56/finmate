@@ -11,10 +11,19 @@
 import type { CurrencyCode } from './currency';
 import { CurrencyConverter, roundHalfUp } from './currency';
 
-/** Asset class (docs/05 §3.7 financial_assets.type). Mirrors Swift `AssetType`. */
-export type AssetType = 'crypto' | 'stock' | 'etf' | 'cash' | 'other';
+/** Asset class (docs/05 §3.7 financial_assets.type). Mirrors Swift `AssetType`
+ *  (ADR-0023: the canonical union — crypto/stock/etf/cash/savings/real_estate/other). */
+export type AssetType = 'crypto' | 'stock' | 'etf' | 'cash' | 'savings' | 'real_estate' | 'other';
 
-export const allAssetTypes: AssetType[] = ['crypto', 'stock', 'etf', 'cash', 'other'];
+export const allAssetTypes: AssetType[] = [
+  'crypto',
+  'stock',
+  'etf',
+  'cash',
+  'savings',
+  'real_estate',
+  'other',
+];
 
 /** Human label for an asset type. */
 export function assetTypeLabel(type: AssetType): string {
@@ -27,6 +36,10 @@ export function assetTypeLabel(type: AssetType): string {
       return 'ETF';
     case 'cash':
       return 'Cash';
+    case 'savings':
+      return 'Savings';
+    case 'real_estate':
+      return 'Real estate';
     case 'other':
       return 'Other';
   }

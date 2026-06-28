@@ -190,11 +190,13 @@ final class AssetsStore {
 enum AssetPalette {
     static func color(for type: AssetType) -> Color {
         switch type {
-        case .crypto: return .orange
-        case .stock:  return .blue
-        case .etf:    return .purple
-        case .cash:   return .green
-        case .other:  return .gray
+        case .crypto:     return .orange
+        case .stock:      return .blue
+        case .etf:        return .purple
+        case .cash:       return .green
+        case .savings:    return .teal
+        case .realEstate: return .brown
+        case .other:      return .gray
         }
     }
     static func gainColor(_ minor: Int64) -> Color { minor >= 0 ? .green : .red }
@@ -437,11 +439,13 @@ struct AssetRow: View {
 
     private var symbol: String {
         switch asset.type {
-        case .crypto: return "bitcoinsign.circle.fill"
-        case .stock:  return "chart.line.uptrend.xyaxis"
-        case .etf:    return "square.grid.2x2.fill"
-        case .cash:   return "banknote.fill"
-        case .other:  return "circle.grid.cross.fill"
+        case .crypto:     return "bitcoinsign.circle.fill"
+        case .stock:      return "chart.line.uptrend.xyaxis"
+        case .etf:        return "square.grid.2x2.fill"
+        case .cash:       return "banknote.fill"
+        case .savings:    return "building.columns.fill"
+        case .realEstate: return "house.fill"
+        case .other:      return "circle.grid.cross.fill"
         }
     }
 }

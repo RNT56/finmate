@@ -2,48 +2,23 @@
 // over the RLS-protected `financial_assets` table (docs/03 §3; docs/05 §3.7). RLS
 // scopes every row to auth.uid() (docs/07 §3); money stays integer minor units.
 //
-// NOTE: the Postgres `asset_type` CHECK vocabulary (stock/crypto/savings/
-// real_estate/other) differs from the Domain `AssetType` (crypto/stock/etf/cash/
-// other). The mappers below translate both directions, mapping the unmatched
-// classes onto the nearest Domain bucket (`savings`->`cash`, `real_estate`->`other`)
-// and Domain `etf`/`cash` back onto `stock`/`savings` for persistence.
+// ADR-0023: the Postgres `asset_type` CHECK vocabulary now matches the Domain
+// `AssetType` exactly (the canonical union — crypto/stock/etf/cash/savings/
+// real_estate/other), so the mappers below round-trip 1:1 with no lossy bucketing.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AssetTypeRow, Database, FinancialAssetRow } from '../../types/database';
 import type { AssetType, FinancialAsset } from '../../core/assets';
 import type { AssetsRepository } from './repository';
 
-/** Postgres `asset_type` -> Domain `AssetType`. */
+/** Postgres `asset_type` -> Domain `AssetType` (1:1; identical vocabularies). */
 export function assetTypeFromRow(type: AssetTypeRow): AssetType {
-  switch (type) {
-    case 'crypto':
-      return 'crypto';
-    case 'stock':
-      return 'stock';
-    case 'savings':
-      return 'cash';
-    case 'real_estate':
-      return 'other';
-    case 'other':
-      return 'other';
-  }
+  return type;
 }
 
-/** Domain `AssetType` -> Postgres `asset_type` (round-trips the common classes;
- *  `etf` has no DB class so it persists as `stock`). */
+/** Domain `AssetType` -> Postgres `asset_type` (1:1; identical vocabularies). */
 export function assetTypeToRow(type: AssetType): AssetTypeRow {
-  switch (type) {
-    case 'crypto':
-      return 'crypto';
-    case 'stock':
-      return 'stock';
-    case 'etf':
-      return 'stock';
-    case 'cash':
-      return 'savings';
-    case 'other':
-      return 'other';
-  }
+  return type;
 }
 
 /** Row -> Domain. Nullable cost/qty/price columns default to 0 (docs/05 §3.7). */
