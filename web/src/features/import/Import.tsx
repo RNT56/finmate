@@ -1,7 +1,9 @@
-// CSV Import page (M6) — paste or upload a subscriptions CSV, preview the valid
-// rows + errors before anything is written, then import only the valid rows via
-// the shared subscriptions hook (same create path as manual add). One glass
-// language; reuses GlassCard + glass tokens. Logic lives in core/csvImport.ts.
+// CSV Import page (M6) — load · map · preview · partial import. Paste or upload a
+// subscriptions CSV, review/override the detected column→field mapping (auto-seeded
+// from the alias match), preview the valid rows + errors before anything is written,
+// then import only the valid rows via the shared subscriptions hook (same create path
+// as manual add). One glass language; reuses GlassCard + glass tokens. Logic lives in
+// core/csvImport.ts.
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,22 +12,68 @@ import { Page } from '../../components/AppShell';
 import { useSubscriptions } from '../subscriptions/useSubscriptions';
 import { formatMoney } from '../../core/money';
 import {
-  parseSubscriptionsCSV,
+  analyzeHeader,
+  parseSubscriptionsCSVWithMapping,
+  CSV_FIELDS,
   SAMPLE_CSV,
+  type ColumnMapping,
+  type CSVField,
   type ImportPreview,
 } from '../../core/csvImport';
+
+/** Human-facing labels for each canonical field (mirrors the Swift `displayName`). */
+const FIELD_LABELS: Record<CSVField, string> = {
+  name: 'Name',
+  amount: 'Amount',
+  currency: 'Currency',
+  billing_period: 'Billing period',
+  payment_method: 'Payment method',
+  category: 'Category',
+  usage_state: 'Usage state',
+  start_date: 'Start date',
+  vendor_url: 'URL',
+};
+
+/** Required fields must resolve to a column before previewing (mirrors `isRequired`). */
+const REQUIRED_FIELDS: readonly CSVField[] = ['name', 'amount'];
+
+/** Sentinel select value meaning "ignore this field" (no column mapped). */
+const IGNORE = -1;
 
 export function Import() {
   const navigate = useNavigate();
   const { add } = useSubscriptions();
+
   const [text, setText] = useState('');
+
+  // Column mapping: the detected header tokens + the user-overridable field→column
+  // map. `headerAnalyzed` gates the mapping card (paste-only state before then).
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<ColumnMapping>({});
+  const [headerAnalyzed, setHeaderAnalyzed] = useState(false);
+
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [imported, setImported] = useState<number | null>(null);
 
-  const runPreview = (source: string) => {
+  /** Reset everything back to the paste/empty state. */
+  const resetFlow = () => {
+    setPreview(null);
     setImported(null);
-    setPreview(parseSubscriptionsCSV(source));
+    setHeaderAnalyzed(false);
+    setHeaders([]);
+    setMapping({});
+    setFileError(null);
+  };
+
+  /** Analyze the current text's header and seed the user-overridable mapping. */
+  const runAnalyze = (source: string) => {
+    const analysis = analyzeHeader(source);
+    setHeaders(analysis.headers);
+    setMapping(analysis.autoMapping);
+    setHeaderAnalyzed(analysis.headers.length > 0);
+    setPreview(null);
+    setImported(null);
   };
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,26 +87,51 @@ export function Import() {
     const reader = new FileReader();
     reader.onload = () => {
       const content = String(reader.result ?? '');
+      resetFlow();
       setText(content);
-      runPreview(content);
+      runAnalyze(content);
     };
+    reader.onerror = () => setFileError('Could not read file.');
     reader.readAsText(file);
+    // Allow re-picking the same file.
+    e.target.value = '';
   };
 
   const loadSample = () => {
-    setFileError(null);
+    resetFlow();
     setText(SAMPLE_CSV);
-    runPreview(SAMPLE_CSV);
+    runAnalyze(SAMPLE_CSV);
+  };
+
+  /** Set (or clear, when `IGNORE`) a field's mapped column; invalidates the preview. */
+  const setFieldColumn = (field: CSVField, value: number) => {
+    setMapping((prev) => {
+      const next = { ...prev };
+      if (value < 0) delete next[field];
+      else next[field] = value;
+      return next;
+    });
+    setPreview(null);
+  };
+
+  const requiredFieldsMapped = REQUIRED_FIELDS.every((f) => mapping[f] !== undefined);
+
+  const runPreview = () => {
+    if (!requiredFieldsMapped) return;
+    setImported(null);
+    setPreview(parseSubscriptionsCSVWithMapping(text, mapping));
   };
 
   const doImport = async () => {
     if (!preview) return;
-    for (const sub of preview.valid) {
+    const toImport = preview.valid;
+    for (const sub of toImport) {
       await add(sub);
     }
-    setImported(preview.valid.length);
-    setPreview(null);
+    const count = toImport.length;
+    resetFlow();
     setText('');
+    setImported(count);
   };
 
   return (
@@ -66,10 +139,10 @@ export function Import() {
       <div className="fm-stack">
         <GlassCard>
           <div className="fm-secondary" style={{ fontSize: 14, marginBottom: 12 }}>
-            Paste a subscriptions CSV or choose a file. We map common column names
-            (name / amount / currency / billing_period / payment_method / category /
-            usage_state / start_date / url), validate every row, and let you preview
-            before anything is saved.
+            Paste a subscriptions CSV or choose a file. Header aliases (name / amount /
+            currency / billing_period / payment_method / category / usage_state /
+            start_date / url) are detected automatically; map any columns that don't
+            match, then preview before anything is saved.
           </div>
 
           <label className="fm-field-label" htmlFor="csv-text">
@@ -88,10 +161,10 @@ export function Import() {
             <button
               type="button"
               className="fm-btn"
-              onClick={() => runPreview(text)}
+              onClick={() => runAnalyze(text)}
               disabled={text.trim().length === 0}
             >
-              Preview
+              Map columns
             </button>
             <button type="button" className="fm-btn-ghost fm-btn" onClick={loadSample}>
               Load sample
@@ -128,11 +201,97 @@ export function Import() {
           )}
         </GlassCard>
 
-        {preview && (
-          <PreviewSection preview={preview} onImport={doImport} />
+        {headerAnalyzed && (
+          <MappingSection
+            headers={headers}
+            mapping={mapping}
+            requiredFieldsMapped={requiredFieldsMapped}
+            onChange={setFieldColumn}
+            onPreview={runPreview}
+          />
         )}
+
+        {preview && <PreviewSection preview={preview} onImport={doImport} />}
       </div>
     </Page>
+  );
+}
+
+function MappingSection({
+  headers,
+  mapping,
+  requiredFieldsMapped,
+  onChange,
+  onPreview,
+}: {
+  headers: string[];
+  mapping: ColumnMapping;
+  requiredFieldsMapped: boolean;
+  onChange: (field: CSVField, value: number) => void;
+  onPreview: () => void;
+}) {
+  return (
+    <GlassCard>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>Map columns</div>
+      <div className="fm-secondary" style={{ fontSize: 13, marginBottom: 12 }}>
+        Detected {headers.length} column{headers.length === 1 ? '' : 's'}. Match each
+        Finmate field to a column. Name and Amount are required.
+      </div>
+
+      <div className="fm-stack" style={{ gap: 8 }}>
+        {CSV_FIELDS.map((field) => {
+          const required = REQUIRED_FIELDS.includes(field);
+          const selectId = `map-${field}`;
+          return (
+            <div
+              key={field}
+              className="fm-row"
+              style={{ justifyContent: 'space-between', gap: 12, alignItems: 'center' }}
+            >
+              <label className="fm-field-label" htmlFor={selectId} style={{ margin: 0 }}>
+                {FIELD_LABELS[field]}
+                {required && (
+                  <span style={{ color: 'var(--fm-warning, #d97706)', marginLeft: 6, fontSize: 12 }}>
+                    Required
+                  </span>
+                )}
+              </label>
+              <select
+                id={selectId}
+                className="fm-select"
+                style={{ maxWidth: 200 }}
+                value={mapping[field] ?? IGNORE}
+                onChange={(e) => onChange(field, Number(e.target.value))}
+                aria-label={`${FIELD_LABELS[field]} column`}
+              >
+                <option value={IGNORE}>— Ignore</option>
+                {headers.map((token, idx) => (
+                  <option key={idx} value={idx}>
+                    {token.trim() === '' ? `Column ${idx + 1}` : token}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
+      </div>
+
+      {!requiredFieldsMapped && (
+        <div className="fm-error" style={{ marginTop: 10, fontSize: 13 }} role="alert">
+          Map Name and Amount to continue.
+        </div>
+      )}
+
+      <button
+        type="button"
+        className="fm-btn"
+        style={{ marginTop: 12, width: '100%' }}
+        onClick={onPreview}
+        disabled={!requiredFieldsMapped}
+      >
+        Preview rows
+      </button>
+    </GlassCard>
   );
 }
 
