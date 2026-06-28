@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { Home } from './components/Home';
@@ -10,6 +11,11 @@ import { Assets } from './features/assets/Assets';
 import { Calculator } from './features/calculator/Calculator';
 import { Import } from './features/import/Import';
 import { Settings } from './features/settings/Settings';
+import { AuthProvider, useAuth } from './features/auth/useAuth';
+import { Login } from './features/auth/Login';
+import { Onboarding } from './features/auth/Onboarding';
+import { isOnboarded, setOnboarded } from './features/auth/onboardingState';
+import { resolveAuthRoute } from './lib/authRoute';
 
 const router = createBrowserRouter([
   {
@@ -30,6 +36,50 @@ const router = createBrowserRouter([
   },
 ]);
 
+/**
+ * Auth + first-run guard (docs/02 §1–2). Resolves the destination from the auth
+ * status and onboarding flag: loading → splash; unauthenticated → Login;
+ * authenticated && first-run → Onboarding; else the app. Default here (no VITE_
+ * env) starts at Login with a working "Try the demo" path, so build/preview is
+ * unaffected.
+ */
+function AuthGate() {
+  const { status, user } = useAuth();
+  // Re-render the gate when onboarding completes within the session.
+  const [onboarded, setOnboardedState] = useState<boolean>(() => isOnboarded());
+
+  const route = resolveAuthRoute(status, onboarded);
+
+  switch (route) {
+    case 'loading':
+      return (
+        <div className="fm-auth-screen" aria-busy="true">
+          <div className="fm-brand">
+            <span className="fm-brand-dot" aria-hidden="true" />
+            Finmate
+          </div>
+        </div>
+      );
+    case 'login':
+      return <Login />;
+    case 'onboarding':
+      return (
+        <Onboarding
+          onComplete={() => {
+            setOnboarded(true);
+            setOnboardedState(true);
+          }}
+        />
+      );
+    case 'app':
+      return <RouterProvider router={router} key={user?.id ?? 'app'} />;
+  }
+}
+
 export function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
+  );
 }

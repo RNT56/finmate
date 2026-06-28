@@ -16,6 +16,13 @@ struct FinmateApp: App {
     /// Biometric app-lock runtime (docs/07). No-op when the toggle is off (default).
     @State private var appLock: AppLockController
 
+    /// Authentication session machine (docs/02 §1). Drives the signed-out / onboarding
+    /// / root routing below; wraps the chosen `AuthRepository`.
+    @State private var authStore: AuthStore
+
+    /// First-run flag (docs/02 §2): true until onboarding completes for this install.
+    @AppStorage("finmate.hasOnboarded") private var hasOnboarded = false
+
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -24,22 +31,26 @@ struct FinmateApp: App {
         let store = PreferencesStore(repository: repositories.preferences)
         _preferencesStore = State(initialValue: store)
         _appLock = State(initialValue: AppLockController(preferencesStore: store))
+        _authStore = State(initialValue: AuthStore(repository: repositories.auth))
     }
 
     var body: some Scene {
         WindowGroup {
             ZStack {
-                RootView()
+                rootContent
                     .environment(\.repositories, repositories)
                     .environment(preferencesStore)
-                if appLock.isLocked {
+                    .environment(\.authStore, authStore)
+                if appLock.isLocked && authStore.state.isSignedIn {
                     AppLockOverlay(controller: appLock)
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: appLock.isLocked)
+            .animation(.easeInOut(duration: 0.25), value: authStore.state)
             .preferredColorScheme(preferencesStore.appearance.preferredColorScheme)
             .task {
                 await preferencesStore.load()
+                await authStore.start()
                 // Lock on launch if the preference is enabled (after prefs load).
                 appLock.start()
             }
@@ -51,6 +62,38 @@ struct FinmateApp: App {
                 }
             }
         }
+    }
+
+    /// Top-level routing (docs/02 §1–2):
+    ///   • `.unknown`  → a neutral splash while the stored session resolves.
+    ///   • `.signedOut` → `AuthView` (Apple / email-password / "Try the demo").
+    ///   • signed in + first run → `OnboardingView`.
+    ///   • signed in, onboarded → `RootView`.
+    @ViewBuilder
+    private var rootContent: some View {
+        switch authStore.state {
+        case .unknown:
+            SplashView()
+        case .signedOut:
+            AuthView(store: authStore, isDemo: repositories.isDemo)
+        case .signedIn:
+            if hasOnboarded {
+                RootView()
+            } else {
+                OnboardingView { hasOnboarded = true }
+            }
+        }
+    }
+}
+
+/// Neutral launch placeholder shown while the stored session resolves (`.unknown`).
+struct SplashView: View {
+    var body: some View {
+        ZStack {
+            FinmateGradient()
+            ProgressView().controlSize(.large)
+        }
+        .ignoresSafeArea()
     }
 }
 

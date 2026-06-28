@@ -75,8 +75,10 @@ final class PreferencesStore {
 struct SettingsView: View {
     @Environment(PreferencesStore.self) private var store
     @Environment(\.repositories) private var repositories
+    @Environment(\.authStore) private var authStore
 
     @State private var showingExport = false
+    @State private var showingLogoutConfirm = false
     @State private var showingDeleteConfirm = false
     @State private var showingDeleteFinalConfirm = false
     @State private var exportData: Data?
@@ -177,6 +179,20 @@ struct SettingsView: View {
                 Text("Locks the app behind device biometrics using LocalAuthentication. Tokens stay in the Keychain.")
             }
 
+            // MARK: Account
+            Section {
+                Button(role: .destructive) {
+                    showingLogoutConfirm = true
+                } label: {
+                    Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+                .accessibilityHint("Signs out and returns to the sign-in screen")
+            } header: {
+                Text("Account")
+            } footer: {
+                Text("Signing out clears your session from the Keychain and returns to the sign-in screen.")
+            }
+
             // MARK: Data
             Section {
                 Button {
@@ -231,6 +247,18 @@ struct SettingsView: View {
             Text(exportError ?? "")
         }
         // Double-confirm account deletion (docs/07) — first dialog, then a final one.
+        .confirmationDialog(
+            "Log out of Finmate?",
+            isPresented: $showingLogoutConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Log out", role: .destructive) {
+                Task { await authStore?.signOut() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You'll return to the sign-in screen. Your session is cleared from the Keychain.")
+        }
         .confirmationDialog(
             "Delete your account?",
             isPresented: $showingDeleteConfirm,

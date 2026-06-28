@@ -31,6 +31,13 @@ targets:
   Finmate:
     type: application
     platform: iOS
+    # Sign in with Apple capability (docs/07 §3). The entitlement is declared so the
+    # signed release build carries it; AuthenticationServices links automatically.
+    entitlements:
+      path: App/Finmate.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     sources:
       - path: App/Sources
     dependencies:
