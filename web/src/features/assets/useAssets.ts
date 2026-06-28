@@ -1,0 +1,90 @@
+// Store/hook for the assets slice (M5) — mirrors the iOS @Observable assets store.
+// Talks to a repository protocol only; all valuation math comes from core/assets.
+// The display currency is a parameter so the EUR/USD/BTC switcher re-converts the
+// portfolio totals (display-only, non-mutating — docs/13 §2; product spec §11).
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type AssetSlice,
+  type FinancialAsset,
+  assetDistribution,
+  portfolioCostBasisMinor,
+  portfolioGainMinor,
+  portfolioValueMinor,
+} from '../../core/assets';
+import { CurrencyConverter, type CurrencyCode, type ExchangeRates } from '../../core/currency';
+import { type AssetsRepository, sharedAssetsRepository } from './repository';
+
+// Sample display rates (identical both clients so figures agree): in production these
+// come from the market-data Edge Function (ADR-0010), never a client-side provider.
+export const SAMPLE_ASSET_RATES: ExchangeRates = {
+  eurUsd: 1.1,
+  btcEur: 50_000,
+  btcUsd: 55_000,
+  fetchedAt: Date.now(),
+};
+
+export interface UseAssets {
+  loading: boolean;
+  assets: FinancialAsset[];
+  /** Portfolio total value in `displayCurrency` minor units. */
+  totalValueMinor: number;
+  /** Portfolio total cost basis in `displayCurrency` minor units. */
+  totalCostMinor: number;
+  /** Portfolio unrealized gain/loss in `displayCurrency` minor units. */
+  totalGainMinor: number;
+  /** Gain as a fraction of cost basis; 0 when cost basis is 0. */
+  totalGainPct: number;
+  /** Descending-by-value distribution by asset type (converted). */
+  distribution: AssetSlice[];
+  converter: CurrencyConverter;
+}
+
+export function useAssets(
+  displayCurrency: CurrencyCode,
+  repository: AssetsRepository = sharedAssetsRepository,
+): UseAssets {
+  const [assets, setAssets] = useState<FinancialAsset[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setAssets(await repository.all());
+    setLoading(false);
+  }, [repository]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const converter = useMemo(() => new CurrencyConverter(SAMPLE_ASSET_RATES), []);
+
+  const totalValueMinor = useMemo(
+    () => portfolioValueMinor(assets, displayCurrency, converter),
+    [assets, displayCurrency, converter],
+  );
+  const totalCostMinor = useMemo(
+    () => portfolioCostBasisMinor(assets, displayCurrency, converter),
+    [assets, displayCurrency, converter],
+  );
+  const totalGainMinor = useMemo(
+    () => portfolioGainMinor(assets, displayCurrency, converter),
+    [assets, displayCurrency, converter],
+  );
+  const totalGainPct = totalCostMinor === 0 ? 0 : totalGainMinor / totalCostMinor;
+  const distribution = useMemo(
+    () => assetDistribution(assets, displayCurrency, converter),
+    [assets, displayCurrency, converter],
+  );
+
+  return {
+    loading,
+    assets,
+    totalValueMinor,
+    totalCostMinor,
+    totalGainMinor,
+    totalGainPct,
+    distribution,
+    converter,
+  };
+}

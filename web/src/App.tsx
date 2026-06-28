@@ -5,6 +5,9 @@ import { Placeholder } from './components/Placeholder';
 import { SubscriptionList } from './features/subscriptions/SubscriptionList';
 import { CashFlow } from './features/cashflow/CashFlow';
 import { Calendar } from './features/calendar/Calendar';
+import { More } from './features/more/More';
+import { Assets } from './features/assets/Assets';
+import { Calculator } from './features/calculator/Calculator';
 
 const router = createBrowserRouter([
   {
@@ -15,7 +18,9 @@ const router = createBrowserRouter([
       { path: 'subscriptions', element: <SubscriptionList /> },
       { path: 'cash-flow', element: <CashFlow /> },
       { path: 'calendar', element: <Calendar /> },
-      { path: 'more', element: <Placeholder title="More" /> },
+      { path: 'more', element: <More /> },
+      { path: 'assets', element: <Assets /> },
+      { path: 'calculator', element: <Calculator /> },
       { path: '*', element: <Placeholder title="Not found" /> },
     ],
   },
