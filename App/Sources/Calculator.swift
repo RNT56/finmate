@@ -133,6 +133,9 @@ struct MoreView: View {
                     NavigationLink(value: MoreDestination.calculator) {
                         Label("BTC Calculator", systemImage: "bitcoinsign.circle.fill")
                     }
+                    NavigationLink(value: MoreDestination.importCSV) {
+                        Label("Import CSV", systemImage: "square.and.arrow.down")
+                    }
                 }
                 Section {
                     NavigationLink(value: MoreDestination.settings) {
@@ -147,6 +150,7 @@ struct MoreView: View {
                 switch destination {
                 case .assets:     AssetsView()
                 case .calculator: CalculatorView()
+                case .importCSV:  ImportView()
                 case .settings:   SettingsStubView()
                 }
             }
@@ -156,7 +160,7 @@ struct MoreView: View {
 }
 
 enum MoreDestination: Hashable {
-    case assets, calculator, settings
+    case assets, calculator, importCSV, settings
 }
 
 /// Settings placeholder (full settings/theming arrives in a later milestone, docs/08).

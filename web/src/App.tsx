@@ -8,6 +8,7 @@ import { Calendar } from './features/calendar/Calendar';
 import { More } from './features/more/More';
 import { Assets } from './features/assets/Assets';
 import { Calculator } from './features/calculator/Calculator';
+import { Import } from './features/import/Import';
 
 const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ const router = createBrowserRouter([
       { path: 'more', element: <More /> },
       { path: 'assets', element: <Assets /> },
       { path: 'calculator', element: <Calculator /> },
+      { path: 'import', element: <Import /> },
       { path: '*', element: <Placeholder title="Not found" /> },
     ],
   },
