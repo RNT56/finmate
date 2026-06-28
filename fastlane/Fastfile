@@ -1,0 +1,60 @@
+# Fastlane lanes for Finmate (docs/09 §5.5, §5.7).
+#
+# Signing: App Store Connect API key (.p8, base64) + `fastlane match` (readonly
+# on CI). All credentials come from CI secrets — never committed:
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (base64), MATCH_PASSWORD, MATCH_GIT_URL
+# Optional: MATCH_GIT_BASIC_AUTHORIZATION for read access to the match repo.
+
+default_platform(:ios)
+
+# Build the App Store Connect API key object from CI secrets.
+def asc_api_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_content: ENV.fetch("ASC_KEY_P8"), # base64-encoded .p8
+    is_key_content_base64: true,
+    in_house: false
+  )
+end
+
+platform :ios do
+  desc "Lint, build, and run unit + snapshot tests on the iPhone 17 simulator"
+  lane :test do
+    setup_ci if ENV["CI"]
+    swiftlint(strict: true) if File.exist?("../.swiftlint.yml")
+    run_tests(
+      scheme: "Finmate",
+      devices: ["iPhone 17"],
+      code_coverage: true
+    )
+  end
+
+  desc "Build a signed beta and upload to TestFlight"
+  lane :beta do
+    setup_ci if ENV["CI"]
+    api_key = asc_api_key
+
+    # Read-only on CI: never mints new certs; pulls from the private match repo.
+    match(
+      type: "appstore",
+      readonly: ENV["CI"] == "true",
+      api_key: api_key
+    )
+
+    increment_build_number(
+      build_number: latest_testflight_build_number(api_key: api_key) + 1
+    )
+
+    build_app(
+      scheme: "Finmate",
+      export_method: "app-store"
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      distribute_external: false,
+      skip_waiting_for_build_processing: true
+    )
+  end
+end

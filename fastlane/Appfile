@@ -1,0 +1,6 @@
+# Fastlane Appfile for Finmate.
+# Apple ID / team credentials are NOT stored here — CI authenticates with an
+# App Store Connect API key (see Fastfile / docs/09 §5.7). The bundle id is the
+# only static identity we pin.
+
+app_identifier("app.finmate.Finmate")
