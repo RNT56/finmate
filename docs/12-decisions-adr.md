@@ -40,6 +40,7 @@ This document is the authoritative source for "why is it built this way?" It res
 | [ADR-0020](#adr-0020--single-canonical-domain-field-names-kill-substimate-duality) | Single canonical domain field names (kill Substimate duality) | Accepted | — |
 | [ADR-0021](#adr-0021--web-client-brought-into-scope-amends-adr-0002) | Web client brought into scope (amends ADR-0002) | Accepted | — |
 | [ADR-0022](#adr-0022--expenses-use-the-normalized-category_id-fk-names-resolved-client-side) | Expenses use the normalized `category_id` FK (names resolved client-side) | Accepted | — |
+| [ADR-0023](#adr-0023--reconcile-asset_type-union-set--fixed_expenses-weekly-frequency-to-the-schema) | Reconcile `asset_type` (union set) + `fixed_expenses` weekly frequency to the schema | Accepted | — |
 
 ---
 
@@ -779,6 +780,37 @@ Expenses use the **normalized `category_id` FK** as the single source of truth, 
 
 ---
 
+## ADR-0023 — Reconcile `asset_type` (union set) + `fixed_expenses` weekly frequency to the schema
+
+- **Status:** Accepted
+- **Date:** 2026-06-28
+- **Owner:** Product owner (`ridfox44@gmail.com`)
+- **Relates to:** [ADR-0015](#adr-0015--asset-valuation-uses-average-cost-basis-in-v1-fifo-deferred), [ADR-0016](#adr-0016--cost-tracker-money-flow-redesign-bucketed-sankey-with-drill-down), [ADR-0020](#adr-0020--single-canonical-domain-field-names-kill-substimate-duality), [docs/05 §3.5, §3.7](./05-data-model.md)
+
+### Context
+
+Two enum divergences between the client domain and the schema were flagged during the live data-layer wiring (the last DTO↔schema mismatches in CLAUDE §2 "Remaining build"):
+
+1. **`financial_assets.asset_type`** — the schema `CHECK` allowed `{stock, crypto, savings, real_estate, other}` while the Swift/TS Domain `AssetType` was `{crypto, stock, etf, cash, other}`. Neither was a superset of the other: the schema lacked `etf`/`cash`, the Domain lacked `savings`/`real_estate`. The `SupabaseAssetRepository` mapping papered over this with a **lossy** fold (`etf → other`, `cash → savings`, `real_estate → other`), which silently corrupted the type on round-trip — exactly the field-representation duality [ADR-0020](#adr-0020--single-canonical-domain-field-names-kill-substimate-duality) exists to kill.
+2. **`fixed_expenses.frequency`** — the schema `CHECK` allowed `{monthly, quarterly, yearly}` while the Domain `BillingPeriod` is `{weekly, monthly, quarterly, yearly}` (and `BillingPeriodMath` already normalizes `weekly`). `income_sources.frequency` already allowed `weekly`; only `fixed_expenses` was missing it, so a weekly fixed expense was representable in the client but rejected by the database.
+
+### Decision
+
+The **schema is the source of truth, widened to the union the client needs** so all three layers (Postgres `CHECK`, Swift `Domain`, web TS `core`) end up identical:
+
+- **`asset_type` canonical set = `{crypto, stock, etf, cash, savings, real_estate, other}`** (the UNION). Migration `20260628001000_reconcile_enums.sql` widens the `financial_assets_asset_type_check` to all seven values; the Domain `AssetType` gains `.savings` and `.realEstate` (raw value `"real_estate"`). The `SupabaseAssetRepository` mapping becomes a **lossless 1:1** round-trip (`toColumn` = `rawValue`, `toDomain` = `AssetType(rawValue:)`), with `real_estate ↔ realEstate` the only camelCase↔snake_case rename.
+- **`fixed_expenses.frequency` gains `weekly`** → `CHECK (frequency IN ('weekly','monthly','quarterly','yearly'))`, matching `BillingPeriod`. No Domain change is needed (it already has `weekly`; `BillingPeriodMath` already normalizes it).
+
+The migration uses idempotent `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` on the default-named inline `CHECK`s; RLS, indexes, triggers, and all other constraints are untouched.
+
+### Consequences
+
+- **Positive:** One enum vocabulary across schema, iOS, and web; asset type round-trips losslessly (no more `etf → other` corruption); weekly fixed expenses persist correctly. Closes the last two DTO↔schema divergences from the data-layer wiring.
+- **Negative:** A small migration to apply on any already-deployed project; the two new asset types appear in the iOS/web type pickers (they iterate `AssetType.allCases`), so legends/icons gain entries (handled).
+- **Follow-on:** none — the reconciliation is complete on both clients and in the schema; runtime verification rides along with the broader hosted-project verification still open in CLAUDE §2.
+
+---
+
 ## Decision dependency map
 
 ```mermaid
@@ -809,6 +841,8 @@ flowchart TD
     A6 --> A14["ADR-0014 Supabase Realtime over delta-polling"]
     A2 --> A13["ADR-0013 Local notifications in v1"]
     A5 --> A15["ADR-0015 Average-cost basis"]
+    A15 --> A23["ADR-0023 Reconcile asset_type + weekly frequency"]
+    A16 --> A23
 ```
 
 ---
