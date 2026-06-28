@@ -1,0 +1,98 @@
+# =============================================================================
+# Finmate — Supabase CLI project configuration
+# -----------------------------------------------------------------------------
+# Local development stack config consumed by `supabase start`, `supabase db
+# reset`, and `supabase functions serve`. Production settings (auth providers,
+# secrets) are managed in the Supabase dashboard / via `supabase secrets set`;
+# never commit real keys here. See docs/05-data-model.md §7.3 and
+# docs/07-security-and-privacy.md for the Edge Function security contract.
+# =============================================================================
+
+project_id = "finmate"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Major version of the Postgres engine on managed Supabase (Postgres 15).
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[inbucket]
+# Local SMTP test inbox (captures auth/confirmation emails during dev).
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[realtime]
+enabled = true
+
+# -----------------------------------------------------------------------------
+# Auth — Sign in with Apple (primary) + email/password (equivalent path).
+# Substimate shipped email/password only; Finmate adds Sign in with Apple.
+# -----------------------------------------------------------------------------
+[auth]
+enabled = true
+# Local dev site URL; the iOS app uses its bundle URL scheme deep link in prod.
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["finmate://auth-callback"]
+# Short-lived access tokens (1h) + rotating refresh tokens (docs/07 §T2).
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+double_confirm_changes = true
+secure_password_change = true
+
+# Sign in with Apple. Client id = the app's Service ID / bundle identifier.
+# The secret is the Apple-generated client secret JWT; supplied via env in prod
+# (never committed). `skip_nonce_check = false` keeps the replay-safe nonce
+# verification mandated by docs/07 §"Sign in with Apple — review rules".
+[auth.external.apple]
+enabled = true
+client_id = "env(SUPABASE_AUTH_APPLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_APPLE_SECRET)"
+skip_nonce_check = false
+
+# -----------------------------------------------------------------------------
+# Edge Functions — exactly two in v1 (docs/05 §7.3).
+# market-data : public-ish rate fetch; the iOS client calls it with its user
+#   JWT, so leave verify_jwt = true (only authenticated users fetch rates and
+#   provider keys stay server-side).
+# delete-account : verifies the JWT IN-CODE via auth.getUser() so it can derive
+#   the identity from the verified caller. verify_jwt stays true (defense in
+#   depth: the gateway rejects unauthenticated calls AND the function re-verifies).
+# -----------------------------------------------------------------------------
+[functions.market-data]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/market-data/index.ts"
+
+[functions.delete-account]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/delete-account/index.ts"

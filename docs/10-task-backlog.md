@@ -1,0 +1,439 @@
+# Task Backlog & TODOs
+
+> The granular, checkbox-tracked work breakdown for Finmate, organized by epic and aligned to the M0–M8 milestones in [`./08-roadmap-and-milestones.md`](./08-roadmap-and-milestones.md). Every task is a discrete unit an engineer or AI agent can pick up, implement, and verify against the linked normative docs.
+
+---
+
+## 0. How to use this backlog
+
+This is a **living document**. It is not a frozen plan; it is the running ledger of what is done, in flight, and discovered. Anyone — human or agent — who touches the codebase is expected to keep it current.
+
+**Conventions for every task**
+
+- `- [ ]` open · `- [~]` in progress · `- [x]` done · `- [-]` cancelled/superseded.
+- Each task has a stable **ID** of the form `M{milestone}-{EPIC}-{nn}` (e.g. `M1-DATA-03`) so PRs, commits, and ADRs can reference it precisely. **Never renumber a shipped ID** — append new ones and mark old ones `[-]` when superseded.
+- A task line may carry inline **tags**: `(dep: M0-PROJ-02)` for a hard dependency, `(see: ./05-data-model.md#subscriptions)` for the governing doc, `(blocks: M6-IMPORT-04)` when other work waits on it.
+- A task is **Done** only when it satisfies the Definition of Done in [`./09-engineering-practices.md`](./09-engineering-practices.md): builds clean under Swift 6 strict concurrency, passes SwiftLint + swift-format, has tests for any pure logic, updates the relevant `/docs`, and merges via a reviewed PR into protected `main`.
+
+**Working agreement for agents (mirrors [`../CLAUDE.md`](../CLAUDE.md) §9)**
+
+- [ ] Before starting a task, read its `(see: …)` doc section in full if it is **normative** ([`./05-data-model.md`](./05-data-model.md), [`./07-security-and-privacy.md`](./07-security-and-privacy.md), [`./12-decisions-adr.md`](./12-decisions-adr.md)).
+- [ ] When you finish a task, check it off **in the same PR** and add any work you discovered to [§15 Discovered work](#15-discovered-work--inbox).
+- [ ] If a task contradicts the Canonical Decisions Brief, stop and propose an ADR rather than diverging.
+- [ ] Keep IDs stable; keep dependencies honest; do not check off a task whose `dep:` is still open.
+
+**Status legend at a glance**
+
+| Marker | Meaning |
+|--------|---------|
+| `[ ]` | Not started |
+| `[~]` | In progress (assignee/agent should note who in the PR) |
+| `[x]` | Done & merged |
+| `[-]` | Cancelled or superseded (leave the line, note why) |
+
+---
+
+## 1. Milestone mapping (mirrors [`./08-roadmap-and-milestones.md`](./08-roadmap-and-milestones.md) §2)
+
+This backlog's milestone numbering is **one-to-one** with the roadmap's "roadmap at a glance" table. The roadmap ([`./08-roadmap-and-milestones.md`](./08-roadmap-and-milestones.md)) is authoritative for milestone sequencing; if the two ever drift, fix this table to match the roadmap.
+
+| Milestone | Theme | Backlog epics that land here |
+|-----------|-------|------------------------------|
+| **M0** | Foundations (repo · SPM · Supabase project · schema/RLS/FORCE · Auth incl. Sign in with Apple · design tokens · CI) | PROJ · DS · DATA · BACK · AUTH · SEC · CI |
+| **M1** | Subscriptions core + analytics | DOMAIN · SUBS · DATA · DS · TEST |
+| **M2** | Income & Expenses + cash-flow metrics | DATA · CASH |
+| **M3** | Cost-tracker money-flow (Sankey) | FLOW |
+| **M4** | Calendar + reminders / local notifications | DATA · CAL · NOTIF |
+| **M5** | Assets + crypto calculator + multi-currency + `market-data` Edge Function | DATA · ASSET · BACK · CALC · CUR |
+| **M6** | CSV import | IMPORT |
+| **M7** | Polish / accessibility / performance + Liquid Glass refinement | PERF · DS · A11Y · SET · HOME |
+| **M8** | Hardening + TestFlight beta + App Store submission | SEC · TEST · STORE |
+
+> **Auth folds into M0.** It is foundational (it gates every later vertical slice), not its own milestone. Likewise the Supabase backend spine, core schema, RLS/FORCE, and hardened RPCs land in M0 so M1+ are pure feature slices on a proven base.
+
+**Cross-cutting epics** (**DS** design system, **DATA** data layer/sync, **SEC** security, **TEST** testing infra, **CI** ci/cd, **A11Y** accessibility, **STORE** App Store) span multiple milestones. Each task is filed under the **earliest milestone where the work first lands** and continues as `…-cont` lines later; the [§13 Cross-cutting epic index](#13-cross-cutting-epic-index) lets you find every task of an epic at a glance.
+
+---
+
+## M0 — Foundations
+
+> **Goal:** A buildable, lintable, testable skeleton **plus the full backend spine and auth**. The empty app launches into a 5-tab `TabView`, the SPM module graph compiles acyclically, a real Supabase project exists with the core schema + RLS (enabled **and** forced) + hardened RPCs, Sign in with Apple + email/password works with Keychain-backed tokens, CI is green, and secret scanning is wired before a single secret can leak. The offline-first repository pattern is proven end-to-end on at least one entity. (See: [`./08-roadmap-and-milestones.md`](./08-roadmap-and-milestones.md), [`./03-architecture.md`](./03-architecture.md), [`./05-data-model.md`](./05-data-model.md), [`./07-security-and-privacy.md`](./07-security-and-privacy.md).)
+
+### M0-PROJ — Project & repository setup
+
+- [ ] **M0-PROJ-01** — Initialize the Xcode 26 project `Finmate.xcodeproj` (or an `.xcworkspace` if you prefer external SPM checkouts), iOS deployment target **18.0**, iPhone-only, portrait + landscape decision deferred to product spec. (see: [`./04-tech-stack.md`](./04-tech-stack.md))
+- [ ] **M0-PROJ-02** — Turn on **Swift 6 language mode** and `SWIFT_STRICT_CONCURRENCY=complete` for the app target and every package. Confirm a clean build with zero concurrency warnings. (see: [`./09-engineering-practices.md`](./09-engineering-practices.md))
+- [ ] **M0-PROJ-03** — Create the `Packages/` directory and scaffold five empty SPM packages with `Package.swift` manifests: `Domain`, `Shared`, `DesignSystem`, `DataLayer`, and a `Features` umbrella (one library product per feature). (dep: M0-PROJ-01, see: [`../CLAUDE.md`](../CLAUDE.md) §5)
+- [ ] **M0-PROJ-04** — Encode the **acyclic dependency rules** in the manifests: `Shared` (leaf) ← `Domain` ← {`DesignSystem`, `DataLayer`} ← `Features/*` ← `App`. Features must declare deps on `Domain` (repository **protocols**) and `DesignSystem` only — never on each other and **never on `DataLayer`**. (dep: M0-PROJ-03, see: [`./03-architecture.md`](./03-architecture.md))
+- [ ] **M0-PROJ-05** — Add a lightweight dependency-graph guard: a script (`Scripts/check-module-graph.sh`) that parses each `Package.swift` and fails if a `Features/*` target imports another feature **or imports `DataLayer`**, or if any cycle exists. Wire it into CI later (blocks: M0-CI-04).
+- [ ] **M0-PROJ-06** — Pin the top-level repo layout from [`../CLAUDE.md`](../CLAUDE.md) §5: `App/`, `Packages/`, `supabase/`, `fastlane/`, `.github/workflows/`, `Scripts/`, `docs/`. Add a `.gitignore` for Xcode/SPM artifacts (`*.xcuserdata`, `.build/`, `DerivedData/`, `*.xcconfig` secrets).
+- [ ] **M0-PROJ-07** — Create per-config `.xcconfig` files (`Debug.xcconfig`, `Release.xcconfig`) for build settings. **No secrets** in xcconfig that is committed; only the Supabase project URL + **anon** key may live in committed config (they are public). (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-PROJ-08** — Add the `App` composition root: `@main struct FinmateApp: App`, a `RootTabView` with the five canonical tabs (Home, Subscriptions, Cash Flow, Calendar, More) showing empty placeholder screens. (dep: M0-PROJ-04, see: [`./03-architecture.md`](./03-architecture.md))
+- [ ] **M0-PROJ-09** — Define the app's **dependency injection** seam in `App`: an `AppEnvironment` (or `@Environment`-injected container) that will later hold repository protocols and the Supabase client. Stub it with no-op/mock dependencies for now. (see: [`./03-architecture.md`](./03-architecture.md))
+- [ ] **M0-PROJ-10** — Add `supabase-swift` as an SPM dependency on `DataLayer` only, pinned to an exact version in `Package.resolved`. Do not import it from `App` or `Features`. (see: [`./04-tech-stack.md`](./04-tech-stack.md))
+
+### M0-DS — Design system skeleton
+
+- [ ] **M0-DS-01** — Create the **design token** layer in `DesignSystem`: spacing scale, corner radii, typography ramp mapped to Dynamic Type text styles, and a semantic color set backed by an Asset Catalog with light/dark variants. No hard-coded hex in feature code, ever. (see: [`./06-design-system.md`](./06-design-system.md))
+- [ ] **M0-DS-02** — Implement the **Liquid Glass capability shim**: a single source of truth (`GlassCapability`) that detects iOS 26+ and exposes a `glassBackground()` view modifier. On iOS 26+ it uses `glassEffect`/`GlassEffectContainer`; on iOS 18–25 it falls back to `.ultraThinMaterial`/`.regularMaterial`. All glass surfaces route through this one modifier. (see: [`./06-design-system.md`](./06-design-system.md), [`./12-decisions-adr.md`](./12-decisions-adr.md))
+- [ ] **M0-DS-03** — Build `GlassCard` (the base surface component) using the M0-DS-02 modifier. Verify it renders on an iOS 18 simulator (Materials) and an iOS 26 simulator (Liquid Glass). (dep: M0-DS-02, blocks: most feature UI)
+- [ ] **M0-DS-04** — Add a `#Preview`-driven **component gallery** view in `DesignSystem` listing every primitive as it is built, so snapshot tests and visual review have one entry point. (see: [`./09-engineering-practices.md`](./09-engineering-practices.md))
+
+### M0-DATA — Data layer skeleton, core schema, RLS & repository wiring
+
+- [ ] **M0-DATA-01** — Define the **repository PROTOCOLS in the `Domain` module** (interfaces only): one protocol per aggregate (`SubscriptionRepository`, `IncomeRepository`, `ExpenseRepository`, `AssetRepository`, `CategoryRepository`, `PreferencesRepository`, `AuthRepository`), each `Sendable`, async, typed-throwing. **Implementations live in `DataLayer`** and arrive per feature milestone; feature modules depend on these `Domain` protocols, never on `DataLayer`. (see: [`./03-architecture.md`](./03-architecture.md))
+- [ ] **M0-DATA-02** — Add in-memory **mock implementations** of each repository protocol (used by previews, unit tests, and M0-PROJ-09's DI stub). (dep: M0-DATA-01)
+- [ ] **M0-DATA-03** — Add the `SwiftData` model container bootstrap (empty schema for now) behind a `LocalStore` type in `DataLayer`. Keep SwiftData types internal to the package — they must not leak into `Domain` or `Features`. (see: [`./12-decisions-adr.md`](./12-decisions-adr.md) — SwiftData-as-cache decision, ADR-0006)
+- [ ] **M0-DATA-04** — Migration: `categories` table (user-owned) + `user_id` FK to `auth.users`, RLS **enabled and forced**, owner-only policies via `auth.uid()`, `updated_at` trigger. Add the `kind text NOT NULL CHECK (kind IN ('subscription','expense'))` discriminator and make the uniqueness constraint `(user_id, kind, name)`. The only seeded, protected (non-deletable) row is **"Other"** (one per `kind`); **"All" and "Favorites" are presentation-layer pseudo-filters, NOT category rows** (aligns with [`./05-data-model.md`](./05-data-model.md#categories) §7.2). (see: [`./05-data-model.md`](./05-data-model.md#categories))
+- [ ] **M0-DATA-05** — Migration: `subscriptions` table DDL with the **canonical** columns — `name, vendor_url, icon, amount_minor bigint, currency, billing_period, payment_method, category_id, usage_state, start_date, end_date, auto_renew, favorite, sort_order, notes` + `user_id`, timestamps. RLS **enabled and forced**, owner-only policies, CHECK constraints (`amount_minor >= 0`, `char_length(name) BETWEEN 1 AND 120`, `currency` in allowed set, valid enums, `payment_method` in the eight allowed cases). **No** `monthlyCost`/`isFavorite` duals. (dep: M0-DATA-04, see: [`./05-data-model.md`](./05-data-model.md#subscriptions))
+- [ ] **M0-DATA-06** — Migration: `subscription_price_history` table + a **`SECURITY DEFINER`** trigger that auto-writes a history row on price/currency change, hardened with `SET search_path = public`, `REVOKE ALL ON FUNCTION … FROM PUBLIC`, NOT granted to `authenticated` (trigger-invoked only), and a per-row owner check. Ports Substimate's pattern from `20260627103000_fix_price_history_currency_and_rpc_hardening.sql` but stores `amount_minor`/`currency` correctly (no pre-store conversion). (dep: M0-DATA-05, see: [`./05-data-model.md`](./05-data-model.md#subscription_price_history), [`./11-substimate-analysis.md`](./11-substimate-analysis.md))
+- [ ] **M0-DATA-07** — Migration: `get_user_categories` RPC (returns user categories + protected defaults), hardened: `SECURITY DEFINER`, `SET search_path = public`, `REVOKE ALL ON FUNCTION … FROM PUBLIC`, `GRANT EXECUTE TO authenticated`. (dep: M0-DATA-04, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-DATA-08** — Generate **Swift types** from the Supabase schema (or hand-author DTOs matching the schema) in `DataLayer`; map snake_case columns to camelCase Swift properties; keep DTOs separate from `Domain` entities. (dep: M0-DATA-05)
+- [ ] **M0-DATA-09** — Implement `SwiftData` `@Model` cache types for `Subscription` (and `Category`) inside `DataLayer`, kept internal to the package. (dep: M0-DATA-03, M0-DATA-05)
+- [ ] **M0-DATA-10** — Implement the **real `SubscriptionRepository`** in `DataLayer` against the `Domain` protocol: reads from SwiftData cache (instant), writes optimistically to cache then to Supabase, reconciles results back into cache. (dep: M0-DATA-08, M0-DATA-09, see: [`./03-architecture.md`](./03-architecture.md))
+- [ ] **M0-DATA-11** — Implement the **sync engine** v1: a `SyncCoordinator` actor that pushes pending local writes and pulls remote changes by `updated_at`, applying **last-write-wins per field** (ADR-0012). Layer **Supabase Realtime** as a latency optimization over this delta-poll baseline (ADR-0014); delta-poll remains the correctness/offline fallback. Document the conflict policy in code comments referencing [`./03-architecture.md`](./03-architecture.md). (dep: M0-DATA-10, blocks: every other pillar's sync)
+- [ ] **M0-DATA-12** — Add **RLS/FORCE verification tests**: SQL/integration tests proving user A cannot read or mutate user B's rows on `subscriptions`, `subscription_price_history`, `categories`, and that RLS is both **enabled and forced** on each. (dep: M0-DATA-04..07, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md), [`./09-engineering-practices.md`](./09-engineering-practices.md) §5)
+- [ ] **M0-DATA-13** — Migration: `dashboard_layouts` table storing card order as **`card_order text[]`** (Swift `cardOrder: [String]`), one row per user + `user_id` FK, RLS **enabled and forced**, owner-only policies, `updated_at` trigger. This is the single canonical home for dashboard ordering — there is **no** `user_preferences.dashboard_layout` alternative. The schema lands here in M0; M1-HOME persists `card_order`, and the full reorder/show-hide framework lands in M7-HOME. (see: [`./05-data-model.md`](./05-data-model.md#dashboardlayout))
+
+### M0-BACK — Supabase backend & migrations infrastructure
+
+- [ ] **M0-BACK-01** — Provision the Supabase project (dev + prod); commit `supabase/config.toml`. Capture the project URL + **anon** key in committed config; store the **service-role** key only in CI/secret stores — never in the repo or bundle. (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-BACK-02** — Establish the **migrations workflow**: `supabase/migrations/*.sql` applied via `supabase db reset` locally and a CI job that runs migrations against an ephemeral Postgres to catch breakage and run the RLS/definer regression gate. Adopt timestamped migration filenames. (see: [`./05-data-model.md`](./05-data-model.md), [`./09-engineering-practices.md`](./09-engineering-practices.md) §5)
+- [ ] **M0-BACK-03** — Add the shared SQL helper/trigger functions — `set_updated_at`, `handle_new_user`, `seed_default_categories`, `prevent_user_id_change` — all **`SECURITY DEFINER`** with `SET search_path = public`, each with `REVOKE ALL ON FUNCTION … FROM PUBLIC` and **NOT** granted to `authenticated` (they are invoked only by triggers). `seed_default_categories` must **not** be directly client-callable; its identity comes from the trigger context (the new user row), never a caller-supplied argument. (see: [`./05-data-model.md`](./05-data-model.md), [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-BACK-04** — Seed the **18 default subscription categories** (`kind='subscription'`) via `seed_default_categories` on new-user creation: AI Chat, Coding, Diffusion, Streaming, Music, Gaming, Productivity, Audio Generation, Video Generation, Cloud Services, Fitness, Health, Food, Transport, Financial, Creative, Social, Other. The only protected (non-deletable) seeded row is **"Other"**; **"All" and "Favorites" are presentation-layer pseudo-filters, NOT seeded rows** (aligns with [`./05-data-model.md`](./05-data-model.md#categories) §7.2). The matching 11 `kind='expense'` categories are seeded in M2-DATA-06. (dep: M0-BACK-03, M0-DATA-04, see: [`./05-data-model.md`](./05-data-model.md#categories))
+- [ ] **M0-BACK-05** — Define the **allowed-currency** + enum domains used by CHECK constraints (`currency IN ('EUR','USD','BTC')`, billing/frequency/usage enums, and the eight `payment_method` cases: `credit_card, debit_card, paypal, bank_transfer, apple_pay, google_pay, crypto, other`) so they are consistent across tables. (see: [`./05-data-model.md`](./05-data-model.md))
+- [ ] **M0-BACK-06** — Scaffold the **`market-data` Edge Function** (returns a static stub; real provider integration in M5) to lock the client contract early. Provider keys will live only in Supabase Edge environment secrets — never in the bundle. (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md), blocks: M5-BACK-01)
+- [ ] **M0-BACK-07** — Implement the **`delete-account` Edge Function** (security-critical): derive the user from the **verified JWT** — build a per-request Supabase client from the caller `Authorization` bearer token, call `auth.getUser()` to obtain the authenticated uid, and **ignore any body-supplied id**; then use the service-role client **only** to call `auth.admin.deleteUser(verifiedUid)`. Reject any request lacking a valid bearer JWT. (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md) §9.3, [`./05-data-model.md`](./05-data-model.md) — Edge Function inventory)
+
+### M0-AUTH — Authentication & onboarding (foundational surface)
+
+- [ ] **M0-AUTH-01** — Implement the `supabase-swift` `AuthClient` in `DataLayer` behind the `AuthRepository` protocol (from `Domain`); configure the SDK to persist the session and **auto-refresh** tokens. (dep: M0-DATA-01, M0-BACK-01)
+- [ ] **M0-AUTH-02** — Route the SDK's token storage through the **Keychain wrapper** (M0-SEC-02) rather than the default store. Verify no token lands in `UserDefaults` (audit with a test). (dep: M0-SEC-02, M0-AUTH-01, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-AUTH-03** — Implement **Sign in with Apple** (`ASAuthorizationController` → Supabase `signInWithIdToken`). Add the Apple Sign In capability + entitlement. (dep: M0-AUTH-01)
+- [ ] **M0-AUTH-04** — Implement **email/password** sign-up, sign-in, and password reset against Supabase Auth, with client-side input validation. (dep: M0-AUTH-01)
+- [ ] **M0-AUTH-05** — Build the `Auth` feature UI: sign-in screen using DesignSystem components, error/toast feedback, loading states. (dep: M0-AUTH-03, M0-AUTH-04, M0-DS-03)
+- [ ] **M0-AUTH-06** — Build **first-run onboarding**: choose default currency, appearance (system/light/dark), and optionally enable biometric lock; persist to `user_preferences`. (dep: M0-AUTH-05, see: [`./02-product-spec.md`](./02-product-spec.md))
+- [ ] **M0-AUTH-07** — Implement **logout**: end the Supabase session, clear the Keychain, and purge sensitive SwiftData caches (clean-on-logout). (dep: M0-AUTH-02, M0-SEC-02, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-AUTH-08** — Add an `AuthStore` (`@Observable`) that drives `App` routing between the auth flow and the main `TabView` based on session state. (dep: M0-AUTH-01, M0-PROJ-08)
+
+### M0-SEC — Security baseline & spine hardening
+
+- [ ] **M0-SEC-01** — Document and enforce **App Transport Security** = HTTPS only in `Info.plist` (no arbitrary-loads exception). (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-SEC-02** — Create a **Keychain wrapper** in `Shared` (or `DataLayer`) for token storage — typed, actor-isolated, with get/set/delete and a "clear all on logout" call. No tokens in `UserDefaults`, ever. Wired to real tokens in M0-AUTH-02. (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-SEC-03** — Add a structured **OSLog** logging facade in `Shared` with subsystem/category conventions and a redaction policy that forbids PII/amounts in logs. (see: [`./09-engineering-practices.md`](./09-engineering-practices.md))
+- [ ] **M0-SEC-04** — Confirm the client ships **only the anon key**; add a CI check (or Gitleaks rule) that fails if a service-role key pattern appears in the app bundle/config. (dep: M0-CI-04)
+- [ ] **M0-SEC-05** — Add an **RPC hardening checklist migration template** (`SECURITY DEFINER`, `SET search_path = public`, `REVOKE ALL ON FUNCTION … FROM PUBLIC`, `GRANT EXECUTE TO authenticated` for client-callable RPCs only, per-row owner check) and use it for every future `SECURITY DEFINER` function. Trigger/helper functions are NOT granted to `authenticated`. (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-SEC-06** — Implement the **app-level biometric lock** scaffold using `LocalAuthentication` (Face ID / Touch ID), gating app entry when enabled, with a configurable timeout. Full polish in M8. (dep: M0-AUTH-06)
+- [ ] **M0-SEC-07** — Stand up the **legal & policy documents stub**: create the `legal/` repo directory and author **draft** Privacy Policy and Terms of Service, versioned in-repo and owned by the product owner. Reserve the stable hosting URLs `https://finmate.app/privacy` and `https://finmate.app/terms` **(owner to confirm domain)** and stand up placeholder pages. This is the M0 stub of the M0→M8 dependency; the final, live, submission-ready versions land in M8-STORE-08. (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md) §9, blocks: M8-STORE-08)
+
+### M0-CI — Continuous integration baseline
+
+- [ ] **M0-CI-01** — Add `.github/workflows/ci.yml`: build the app and run `swift test` for each package on a macOS runner with Xcode 26 selected via `xcode-select`/`maxim-lobanov/setup-xcode`. Trigger on PR and on push to `main`.
+- [ ] **M0-CI-02** — Add **SwiftLint** with a strict `.swiftlint.yml` (no force-unwrap on production paths, line length, file length, cyclomatic complexity) and run `swiftlint --strict` in CI. (see: [`./09-engineering-practices.md`](./09-engineering-practices.md))
+- [ ] **M0-CI-03** — Add **swift-format** with a committed `.swift-format` config and run `swift-format lint --recursive --strict .` in CI.
+- [ ] **M0-CI-04** — Add the **Gitleaks** secret-scan job (`gitleaks/gitleaks-action`) to fail any PR that introduces a secret. This must land before any backend keys are configured. (dep: none — do early, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-CI-05** — Add a **dependency review** job (`actions/dependency-review-action`) and enable Dependabot for SPM + GitHub Actions.
+- [ ] **M0-CI-06** — Add the **DB/RLS regression gate** to CI: a job that runs migrations against an ephemeral Postgres (`supabase db reset`) and executes RLS/definer regression tests (e.g. pgTAP / `pg_prove`) asserting RLS is **enabled AND forced on every table**, a second user reads zero rows of another user's data, and every `SECURITY DEFINER` function has `search_path` pinned + `REVOKE PUBLIC` + no caller-supplied uid argument. (dep: M0-BACK-02, see: [`./09-engineering-practices.md`](./09-engineering-practices.md) §5 and §12 quality-gates table, [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M0-CI-07** — Configure **branch protection** on `main`: require the build/test, lint, format, gitleaks, dependency-review, and DB/RLS regression checks; require one review; enforce conventional-commit PR titles. (dep: M0-CI-01..06)
+- [ ] **M0-CI-08** — Wire the module-graph guard (M0-PROJ-05) into CI as a required check. (dep: M0-PROJ-05, M0-CI-01)
+- [ ] **M0-CI-09** — Establish **code signing & CI credentials**: adopt an **App Store Connect API key (`.p8`)** + **`fastlane match`** storing certificates/profiles in a **private git repo**. Wire the exact CI secrets — `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (base64-encoded), `MATCH_PASSWORD`, `MATCH_GIT_URL`, `MATCH_GIT_BASIC_AUTHORIZATION` — into the GitHub Actions secret store (never in the repo). On CI run `fastlane setup_ci` then `match(readonly: true)` so runners fetch-but-never-mutate signing assets. No "match vs. manual per the team" indecision — match is the decision. (see: [`./09-engineering-practices.md`](./09-engineering-practices.md) §5.5, [`./04-tech-stack.md`](./04-tech-stack.md), blocks: M8-STORE-01, M8-STORE-02)
+
+---
+
+## M1 — Subscriptions core + analytics
+
+> **Goal:** The flagship pillar end to end: list, detail, create/edit, favorites, usage state, categories, price history, and subscription analytics — fully offline-first, with the `Money` value type and Swift Charts, on a customizable Home dashboard. This milestone proves the offline-first slice that every later feature reuses. (See: [`./02-product-spec.md`](./02-product-spec.md), [`./06-design-system.md`](./06-design-system.md).)
+
+### M1-DOMAIN — Money & domain primitives
+
+- [ ] **M1-DOMAIN-01** — Implement the **`Money` value type** in `Domain`: `amount_minor: Int64` + `currency: CurrencyCode`, arithmetic via `Decimal`, never `Double`/`Float`. Include `satsPerBTC` (100,000,000) handling for BTC. (see: [`./05-data-model.md`](./05-data-model.md), [`./12-decisions-adr.md`](./12-decisions-adr.md) — ADR-0005)
+- [ ] **M1-DOMAIN-02** — Unit tests for `Money`: rounding, addition across same currency, rejection of cross-currency arithmetic without explicit conversion, BTC↔sats edge cases, large `Int64` values. (dep: M1-DOMAIN-01, see: [`./09-engineering-practices.md`](./09-engineering-practices.md))
+- [ ] **M1-DOMAIN-03** — Implement **money formatting** in `Shared`: locale-aware fiat formatting from minor units; BTC/sats formatting; respects display currency. Unit-tested. (dep: M1-DOMAIN-01)
+- [ ] **M1-DOMAIN-04** — Implement the **`Subscription` domain entity** + value types (`BillingPeriod`, `UsageState`, `PaymentMethod` with the eight cases) in `Domain`, decoupled from the `DataLayer` DTO. (see: [`./05-data-model.md`](./05-data-model.md#subscriptions))
+- [ ] **M1-DOMAIN-05** — Implement **normalized cost math**: convert any `billing_period` to a normalized monthly/yearly cost for comparison and analytics. Unit-tested against known cases. (dep: M1-DOMAIN-01)
+
+### M1-SUBS — Subscriptions feature
+
+- [ ] **M1-SUBS-01** — Build `SubscriptionsListView` + `SubscriptionsStore` (`@Observable`): grouped by category, sortable, searchable, favorites pinned. Reads from `SubscriptionRepository`. (dep: M0-DATA-10, M1-DOMAIN-04)
+- [ ] **M1-SUBS-02** — Build `SubscriptionDetailView`: shows normalized cost, next charge, usage state, and a price-history chart. (dep: M1-SUBS-01, M1-DOMAIN-05)
+- [ ] **M1-SUBS-03** — Build the **add/edit subscription** form: name (1–120 chars, mirroring the DB CHECK), vendor URL, icon picker (SF Symbols + bespoke), amount entry that produces `Int64` minor units, currency, billing period, payment method (eight cases), category, usage state, dates, auto-renew, favorite, notes. Client-side validation mirroring DB CHECK constraints. (dep: M1-SUBS-01, see: [`./05-data-model.md`](./05-data-model.md#subscriptions))
+- [ ] **M1-SUBS-04** — Implement **optimistic create/update/delete** with toast feedback and rollback on sync failure. The reorder RPC is `batch_reorder_subscriptions`; the delete RPC is `delete_subscription`. (dep: M1-SUBS-03, M0-DATA-11, see: [`./05-data-model.md`](./05-data-model.md))
+- [ ] **M1-SUBS-05** — Implement **favorite toggle** and **drag-to-reorder** (`sort_order`, persisted via `batch_reorder_subscriptions`) on the list. (dep: M1-SUBS-01)
+- [ ] **M1-SUBS-06** — Implement **usage-state** quick actions (active/rarely/unused) and surface "rarely/unused" cost in analytics. (dep: M1-SUBS-01)
+- [ ] **M1-SUBS-07** — Build the **subscriptions analytics** view with Swift Charts: monthly spend trend, category distribution, lifetime cost, payment-method breakdown, usage stats. All aggregation in pure, unit-tested functions in `Domain`/`Shared`. (dep: M1-DOMAIN-05, blocks: M7-HOME)
+- [ ] **M1-SUBS-08** — Render the **price-history** timeline from `subscription_price_history`, distinguishing corrections (`is_correction`). (dep: M0-DATA-06, M1-SUBS-02)
+
+### M1-DATA — Subscriptions data wiring (cont. from M0)
+
+- [ ] **M1-DATA-01** — Wire the `SubscriptionRepository` (from M0-DATA-10) and its SwiftData cache into the `Subscriptions` feature's DI; register it with the `SyncCoordinator` so subscription writes flow through delta-poll + Realtime. (dep: M0-DATA-10, M0-DATA-11)
+- [ ] **M1-DATA-02** — Back the category picker with `get_user_categories` (passing `p_kind='subscription'`); honor the protected, non-deletable seeded category **"Other"**. "All" and "Favorites" are presentation-layer pseudo-filters rendered by the picker, **not** category rows. (dep: M0-DATA-07)
+
+### M1-DS — Design system (subscriptions-driven components)
+
+- [ ] **M1-DS-01** — Build `GlassButton` with `.glass` / `.glassProminent` styles on iOS 26 and Material/tinted fallback on iOS 18–25, routed through the M0-DS-02 capability shim. (dep: M0-DS-02)
+- [ ] **M1-DS-02** — Build `GlassListRow`, `Badge`/`Pill` (for usage state & categories), and `AmountText` (renders `Money` correctly). (dep: M0-DS-03, M1-DOMAIN-03)
+- [ ] **M1-DS-03** — Build the `SwiftCharts` wrapper components used by analytics (bar/line/donut) with shared axis/legend styling and reduce-motion support. (dep: M0-DS-01)
+- [ ] **M1-DS-04** — Add the **scroll-edge effect** treatment for scrollable glass surfaces on iOS 26 with graceful no-op on older OSes. (dep: M0-DS-02)
+- [ ] **M1-DS-05** — Build a **toast** component (the native, single-design replacement for Substimate's `ToastContext`) for optimistic-write success/error feedback. (dep: M0-DS-03)
+
+### M1-HOME — First Home dashboard cards
+
+- [ ] **M1-HOME-01** — Build the first **customizable/draggable Home dashboard** cards, persisting order to `dashboard_layouts.card_order` (the M0-DATA-13 table; Swift `cardOrder: [String]`), seeded with a subscription summary card + a chart card. Full card framework + reorder polish lands in M7. (dep: M0-DATA-13, M1-SUBS-07, see: [`./05-data-model.md`](./05-data-model.md#dashboardlayout))
+
+### M1-TEST — Testing infrastructure (stood up here)
+
+- [ ] **M1-TEST-01** — Stand up **Swift Testing** targets for `Domain`, `DataLayer`, `Shared`; ensure they run via `swift test` and in CI. (dep: M0-CI-01)
+- [ ] **M1-TEST-02** — Add **swift-snapshot-testing** to `DesignSystem`; snapshot the component gallery (M0-DS-04) in light + dark and at a small and an XXL Dynamic Type size. (dep: M0-DS-04)
+- [ ] **M1-TEST-03** — Add a **mock-repository test harness** so feature Stores can be tested without Supabase. (dep: M0-DATA-02)
+- [ ] **M1-TEST-04** — Author **store-level tests** for `SubscriptionsStore`: optimistic update + rollback, sort/filter, favorite toggle. (dep: M1-SUBS-04, M1-TEST-03)
+
+---
+
+## M2 — Income & Expenses + cash-flow metrics
+
+> **Goal:** Income sources, fixed and variable expenses, and the combined cash-flow view (net monthly flow, surplus/deficit, normalized recurring totals) — reusing the M1 sync slice. (See: [`./02-product-spec.md`](./02-product-spec.md), [`./11-substimate-analysis.md`](./11-substimate-analysis.md).)
+>
+> **Status note (2026-06-28):** M2 cash-flow KPIs shipped on **iOS + web**. The Cash Flow tab/section is live with the v1 metric set — **Monthly Income / Monthly Expenses / Net / Savings-rate %** — computed by the shared [`./13-algorithms-and-calculations.md`](./13-algorithms-and-calculations.md) §6 cash-flow math (`CashFlowMetrics`: net = income − expenses, savings rate = net/income with 0 when income 0; income frequency normalized weekly ×52/12, monthly ×1, yearly /12, `one_time` excluded from the recurring monthly roll-up). Income/expense entities + in-memory repos and the monthly roll-ups exist on both clients (Swift `Domain` + web `core/`), against identical test vectors. Remaining M2 work is the real Supabase-backed repos (the schema migrations already exist in `supabase/migrations/`) and the fuller per-section list/edit UIs.
+
+### M2-DATA — Cash-flow schema
+
+- [ ] **M2-DATA-01** — Migration: `income_sources` (`source/name, amount_minor, currency, frequency, next_payment, notes`) + `user_id`, RLS **enabled and forced**, CHECK (`char_length(name) BETWEEN 1 AND 120`), `updated_at`. (see: [`./05-data-model.md`](./05-data-model.md#income_sources))
+- [ ] **M2-DATA-02** — Migration: `fixed_expenses` (`name, amount_minor, currency, category_id, due_date, frequency, autopay, notes`) + RLS **enabled and forced** + CHECK. (see: [`./05-data-model.md`](./05-data-model.md#fixed_expenses))
+- [ ] **M2-DATA-03** — Migration: `variable_expenses` (`name, amount_minor, currency, category_id, spent_on, notes`) + RLS **enabled and forced** + CHECK. The date column is `spent_on` (Swift `spentOn`) to avoid shadowing the SQL `date` type. (see: [`./05-data-model.md`](./05-data-model.md#variable_expenses))
+- [~] **M2-DATA-04** — Implement `IncomeRepository` and `ExpenseRepository` in `DataLayer` against their `Domain` protocols (real, offline-first) + SwiftData cache models + sync registration. (dep: M2-DATA-01..03, M0-DATA-11) — *income/expense entities + repository protocols and **in-memory** implementations now exist on both clients (Swift `Domain`, web `core/` + `features/cashflow/`), mirroring the M1 Subscriptions pattern; the real SwiftData/Supabase-backed offline-first impl + sync registration remains.*
+- [ ] **M2-DATA-05** — RLS/FORCE verification tests for the three cash-flow tables. (dep: M2-DATA-01..03, see: [`./09-engineering-practices.md`](./09-engineering-practices.md) §5)
+- [ ] **M2-DATA-06** — Migration: extend **`seed_default_categories`** to also seed the **11 expense categories** with `kind='expense'` — Housing, Transportation, Food, Utilities, Insurance, Healthcare, Entertainment, Shopping, Education, Savings, Other — alongside the existing 18 subscription categories (`kind='subscription'`, M0-BACK-04). Update **`get_user_categories`** to take a `p_kind` argument and filter by it. `fixed_expenses`/`variable_expenses.category_id` FKs resolve against `kind='expense'`; `subscriptions.category_id` against `kind='subscription'`. The protected, non-deletable seeded row is **"Other"** per `kind`; "All"/"Favorites" remain presentation-layer pseudo-filters, not rows. (dep: M0-BACK-03, M0-BACK-04, M0-DATA-04, M2-DATA-02, M2-DATA-03, see: [`./05-data-model.md`](./05-data-model.md#categories), [`./02-product-spec.md`](./02-product-spec.md) §5.2)
+
+### M2-CASH — Cash Flow feature
+
+- [x] **M2-CASH-01** — Build the **Cash Flow** tab shell with sub-sections for Income, Fixed Expenses, Variable Expenses. (dep: M2-DATA-04) — *the placeholder Cash Flow tab/section is replaced by a live screen on both iOS (`App/`) and web (`web/src/features/cashflow/`), in the Liquid Glass language.*
+- [ ] **M2-CASH-02** — Income list + add/edit form with frequency handling (`weekly|monthly|yearly|one_time`) and `Money` entry. (dep: M2-CASH-01)
+- [ ] **M2-CASH-03** — Fixed-expense list + add/edit form (frequency `monthly|quarterly|yearly`, autopay flag, category). (dep: M2-CASH-01)
+- [ ] **M2-CASH-04** — Variable-expense list + add/edit form (single-date via `spent_on`, category). (dep: M2-CASH-01)
+- [x] **M2-CASH-05** — **Cash-flow summary**: normalized monthly income vs. expenses (incl. subscriptions), net surplus/deficit, with Swift Charts. Aggregation in pure, tested functions. New Home dashboard cards ("Monthly net flow", "Income vs. outflow", variable-spend summary). (dep: M2-CASH-02..04, M1-SUBS-07) — *the v1 KPI set (Monthly Income / Monthly Expenses / Net / Savings-rate %) is live on both clients via the shared `CashFlowMetrics` ([`./13-algorithms-and-calculations.md`](./13-algorithms-and-calculations.md) §6); iOS uses Swift Charts and web mirrors it. The fuller Home dashboard cards land with M7-HOME.*
+- [x] **M2-CASH-06** — Store-level tests for income/expense optimistic writes and the normalization math (including `one_time` exclusion from recurring totals). (dep: M2-CASH-05, M1-TEST-03) — *normalization math (frequency factors + `one_time` exclusion + savings-rate-zero-income) is unit-tested in both cores against identical [`./13-algorithms-and-calculations.md`](./13-algorithms-and-calculations.md) vectors (`swift test`, Vitest); store-level optimistic-write tests follow with the real repos in M2-DATA-04.*
+
+---
+
+## M3 — Cost-tracker money-flow (Sankey)
+
+> **Goal:** The cost-tracker money-flow visualization — income → categories → expenses/savings — rendered with a custom `Canvas`/`Path` Sankey renderer (Swift Charts has no built-in Sankey). (See: [`./12-decisions-adr.md`](./12-decisions-adr.md) — ADR-0011 Swift Charts + custom Sankey renderer, [ADR-0016](./12-decisions-adr.md#adr-0016--cost-tracker-money-flow-redesign-bucketed-sankey-with-drill-down) bucketed-Sankey topology; [`./06-design-system.md`](./06-design-system.md).)
+>
+> **Status note (2026-06-28):** M3 money-flow has **shipped** per [ADR-0016](./12-decisions-adr.md#adr-0016--cost-tracker-money-flow-redesign-bucketed-sankey-with-drill-down). The bucketed model + the deterministic flow-*layout* (`total = max(income, Σbuckets)`; proportional node heights and ribbon segments; over-budget clamp) live in the **shared core** (Swift `MoneyFlowLayoutEngine` + web `core/moneyflow.ts`), unit-tested with matching vectors against [`./13-algorithms-and-calculations.md`](./13-algorithms-and-calculations.md) §6.5. The chart now **renders on both clients** — a `Canvas`/`Path` Sankey on iOS and inline SVG on web — wired into the Cash Flow screen (Income → Fixed/Variable/Subscriptions/Savings with proportional ribbons). Drill-down into per-category sub-flows remains a follow-up.
+
+### M3-FLOW — Money-flow engine & renderer
+
+- [x] **M3-FLOW-01** — Implement the **flow-graph model** in `Domain`: nodes (income sources, categories, savings) and weighted edges computed from normalized cash-flow data. Pure + unit-tested. (dep: M2-CASH-05) — *shipped on both clients: the bucketed `MoneyFlow` value model (Swift `Domain` + web `core/moneyflow.ts`) per [ADR-0016](./12-decisions-adr.md#adr-0016--cost-tracker-money-flow-redesign-bucketed-sankey-with-drill-down), with the deterministic node/link **layout** function, unit-tested with matching vectors ([`./13-algorithms-and-calculations.md`](./13-algorithms-and-calculations.md) §6.5).*
+- [x] **M3-FLOW-02** — Implement a **Sankey layout algorithm** (node ranking, vertical positioning, edge curve geometry) as pure functions. Unit-tested for determinism and conservation (inflow == outflow). (dep: M3-FLOW-01) — *shipped: the deterministic bucketed layout (`total = max(income, Σbuckets)`, proportional node heights + scaled income-edge ribbon segments) in the shared core (Swift + TS), unit-tested incl. the over-budget case.*
+- [x] **M3-FLOW-03** — Build the **`SankeyView`** (`FlowDiagram`) in `DesignSystem` using `Canvas`/`Path`, themed with design tokens and Liquid Glass surfaces, with reduce-motion-aware animated transitions. (dep: M3-FLOW-02, M0-DS-01) — *shipped as `MoneyFlowView` (`Canvas`/`Path`, palette tokens, reduce-transparency + VoiceOver fallbacks) in the App target and a web SVG `MoneyFlow` component; extraction into a standalone `DesignSystem` SPM package is a later refactor.*
+- [ ] **M3-FLOW-04** — Make the renderer **accessible**: VoiceOver describes each flow ("Salary → Housing: €1,200/mo"); provide a tabular fallback for users who can't parse the diagram. (dep: M3-FLOW-03, see: [`./06-design-system.md`](./06-design-system.md))
+- [ ] **M3-FLOW-05** — Build the **Cost Tracker** screen wiring the engine to the renderer, with period selection (month/quarter/year) and drill-down into a category. (dep: M3-FLOW-03)
+- [ ] **M3-FLOW-06** — Snapshot tests of `SankeyView` at representative datasets and Dynamic Type sizes. (dep: M3-FLOW-03, M1-TEST-02)
+- [ ] **M3-FLOW-07** — *(Evaluate)* whether to replace the custom renderer with a vetted SPM dependency; record the decision as an ADR either way. (see: [`./12-decisions-adr.md`](./12-decisions-adr.md))
+
+---
+
+## M4 — Calendar + reminders / local notifications
+
+> **Goal:** The payday calendar surfacing income paydays and upcoming subscription/expense charges, with opt-in **local** reminders (ADR-0013). Remote/server-driven push or email reminders are post-v1. (See: [`./02-product-spec.md`](./02-product-spec.md).)
+>
+> **Status note (2026-06-28):** **M4 has shipped on both clients.** The pure recurrence/occurrence engine (`PaydayCalendar` in Swift `Domain`, `recurrence.ts` in web `core/`: `CalendarEvent`, subscription charges, income paydays, fixed-expense due dates with **anchor-based** day-of-month clamping, `events(in:)`, `reminderDates(...)`) ships in the shared core with identical [`./13-algorithms-and-calculations.md`](./13-algorithms-and-calculations.md) §11 test vectors (iOS +17 tests → 73; web +21 → 96). The **Calendar** tab/route is now a real month-grid calendar with per-kind event dots + a day-detail list on iOS (`CalendarView`) and web (`Calendar.tsx`); iOS also ships a `UNUserNotificationCenter` reminder scheduler (`UNCalendarNotificationTrigger`, gated, compiled). **Still open:** the `M4-DATA-01` notifications migration, per-day-net / rolling-balance (M4-CAL-03), full VoiceOver day summaries (M4-CAL-04), the permission-timing UX + lead-time/per-subscription-flag wiring (M4-NOTIF-01/02, which depend on the data layer + Settings), and the Settings toggles (M4-NOTIF-03, lands in M7).
+
+### M4-DATA — Notifications schema (cont. from M0)
+
+- [ ] **M4-DATA-01** — Migration: add the **notifications columns**. To `user_preferences`: `payment_reminders_enabled boolean NOT NULL DEFAULT true`, `payday_reminders_enabled boolean NOT NULL DEFAULT true`, `reminder_lead_time_days integer NOT NULL DEFAULT 2 CHECK (reminder_lead_time_days BETWEEN 0 AND 30)`. To `subscriptions`: `reminders_enabled boolean NOT NULL DEFAULT false`. Add the matching Swift fields (camelCase) to the `user_preferences` and `subscription` DTOs + domain entities, and surface them through `PreferencesRepository`/`SubscriptionRepository`. RLS unchanged (inherited by the existing tables). (dep: M0-DATA-05, M7-SET-01, see: [`./05-data-model.md`](./05-data-model.md#user_preferences), blocks: M4-NOTIF-02, M4-NOTIF-03)
+
+### M4-CAL — Payday & charges calendar
+
+- [x] **M4-CAL-01** — Implement a pure **occurrence-projection engine** in `Domain`: from frequencies + anchor dates, project the next N income paydays and subscription/expense charges within a date window. Unit-tested across DST, month-end, leap years. (dep: M1-DOMAIN-05, M2-CASH-02..04) — *shipped on both clients (`PaydayCalendar` Swift + `recurrence.ts`), anchor-based clamping (Jan-31 → Feb-28/Mar-31/Apr-30, leap-year cases), unit-tested with matching vectors.*
+- [x] **M4-CAL-02** — Build the **calendar UI**: month grid + agenda list, color-coded income vs. outgoing, day detail sheet. (dep: M4-CAL-01, M0-DS-03) — *shipped: month grid + per-kind event dots + day-detail list on iOS (`CalendarView`) and web (`Calendar.tsx`), Liquid Glass tokens.*
+- [ ] **M4-CAL-03** — Show **per-day net** and a rolling balance projection on the agenda. (dep: M4-CAL-01)
+- [ ] **M4-CAL-04** — Calendar accessibility: VoiceOver day summaries, Dynamic Type, reduce-motion. (dep: M4-CAL-02)
+
+### M4-NOTIF — Local notifications
+
+- [ ] **M4-NOTIF-01** — Request notification permission at the right moment (not on launch); handle denial gracefully. (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md) — least-privilege prompts)
+- [~] **M4-NOTIF-02** — Schedule **local** reminders for upcoming charges/paydays via `UNUserNotificationCenter`, honoring the per-subscription `reminders_enabled` flag and the `reminder_lead_time_days` preference; reschedule on data change; no server push in v1 (ADR-0013). (dep: M4-CAL-01, M4-NOTIF-01, M4-DATA-01) — *the `NotificationScheduler` (`UNCalendarNotificationTrigger` from `reminderDates`, future-only) is implemented and compiles, gated behind a toggle; honoring the persisted `reminders_enabled` / `reminder_lead_time_days` and rescheduling-on-change await M4-DATA-01 + the real data layer.*
+- [ ] **M4-NOTIF-03** — Settings toggles + lead-time preference for reminders, persisted via the reminder columns (`payment_reminders_enabled`, `payday_reminders_enabled`, `reminder_lead_time_days` in `user_preferences`; per-subscription `reminders_enabled`). (dep: M4-NOTIF-02, M4-DATA-01, blocks: none)
+
+---
+
+## M5 — Assets + crypto calculator + multi-currency + market-data Edge Function
+
+> **Goal:** Assets/investments with transactions, the BTC/crypto calculator converting fiat↔sats using **server-side** market data via the `market-data` Supabase Edge Function (provider keys stay server-side), and app-wide multi-currency display. (See: [`./05-data-model.md`](./05-data-model.md), [`./07-security-and-privacy.md`](./07-security-and-privacy.md).)
+
+### M5-DATA — Assets schema
+
+- [ ] **M5-DATA-01** — Migration: `financial_assets` (`name, type, value_minor, currency, quantity, purchase_price_minor, purchase_date, current_price_minor, notes`) + RLS **enabled and forced** + CHECK. Semantics (ADR-0015, average-cost basis in v1): `purchase_price_minor` = TOTAL cost basis (aggregate invested), `current_price_minor` = latest PER-UNIT market price, `value_minor` = current TOTAL market value; unrealized gain/loss = `value_minor − purchase_price_minor`. (see: [`./05-data-model.md`](./05-data-model.md#financial_assets) §3.7)
+- [ ] **M5-DATA-02** — Migration: `asset_transactions` (`asset_id, type buy|sell|dividend|other, quantity, price_minor, currency, date, fees_minor, notes`) + RLS **enabled and forced** + CHECK + FK to `financial_assets`. (dep: M5-DATA-01, see: [`./05-data-model.md`](./05-data-model.md#asset_transactions))
+- [ ] **M5-DATA-03** — Implement `AssetRepository` in `DataLayer` against its `Domain` protocol (offline-first) + SwiftData cache + sync registration. (dep: M5-DATA-01..02, M0-DATA-11)
+- [ ] **M5-DATA-04** — RLS/FORCE verification tests for both asset tables. (dep: M5-DATA-01..02, see: [`./09-engineering-practices.md`](./09-engineering-practices.md) §5)
+
+### M5-ASSET — Assets feature
+
+- [ ] **M5-ASSET-01** — Asset list + detail showing average-cost basis, current value, unrealized gain/loss (pure, tested math per ADR-0015). (dep: M5-DATA-03, M1-DOMAIN-01)
+- [ ] **M5-ASSET-02** — Add/edit asset + record transactions (buy/sell/dividend/other) with fees; recompute holdings under average-cost basis. (dep: M5-ASSET-01)
+- [ ] **M5-ASSET-03** — Portfolio summary chart (allocation by type) via Swift Charts. (dep: M5-ASSET-01, M1-DS-03)
+
+### M5-BACK / M5-CALC — Edge Function & crypto calculator
+
+- [ ] **M5-BACK-01** — Complete the **`market-data` Edge Function** (from the M0 stub): fetch fiat FX + BTC spot from a public provider using a **server-side** API key from the Edge Function environment; cache; return normalized rates. No provider key ever reaches the client. (dep: M0-BACK-06, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md), [`./11-substimate-analysis.md`](./11-substimate-analysis.md), [`./12-decisions-adr.md`](./12-decisions-adr.md) — ADR-0010)
+- [ ] **M5-BACK-02** — Add caching/rate-limiting in the Edge Function and an auth check so only `authenticated` callers may invoke it. (dep: M5-BACK-01)
+- [ ] **M5-BACK-03** — Edge Function tests + local `supabase functions serve` instructions in the function's README. (dep: M5-BACK-01)
+- [ ] **M5-CALC-01** — Implement the **BTC↔fiat conversion math** in `Domain` using `satsPerBTC` (100,000,000), integer-safe, unit-tested. (dep: M1-DOMAIN-01)
+- [ ] **M5-CALC-02** — Build the **calculator UI**: enter fiat → see sats/BTC and vice-versa, with the live rate fetched via the `market-data` Edge Function (with a cached fallback + "last updated" timestamp). (dep: M5-CALC-01, M5-BACK-01)
+- [ ] **M5-CALC-03** — Calculator store tests with a mocked rate provider. (dep: M5-CALC-02, M1-TEST-03)
+
+### M5-CUR — Multi-currency
+
+- [ ] **M5-CUR-01** — Migration: `currency_preferences` (`display_currency, exchange_rates jsonb, last_updated`) + RLS **enabled and forced**. (see: [`./05-data-model.md`](./05-data-model.md#currency_preferences))
+- [ ] **M5-CUR-02** — Implement a **conversion service** in `Shared`: converts a `Money` from native to display currency using cached rates (refreshed via the `market-data` Edge Function), always preserving the stored native amount. Pure + tested. (dep: M1-DOMAIN-01, M5-BACK-01)
+- [ ] **M5-CUR-03** — Thread display-currency conversion through all aggregates/analytics views; verify totals never mutate stored native amounts (regression test for Substimate's pre-store-conversion bug). (dep: M5-CUR-02, see: [`./11-substimate-analysis.md`](./11-substimate-analysis.md))
+
+> **Parallelism note (mirrors roadmap §3/§9):** the **currency engine + `market-data` Edge Function** slice (M5-BACK-01..03, M5-CUR-01..02) may begin right after M0 — it unblocks home-currency totals in M1/M2. The **assets + calculator UI** slice completes the milestone.
+
+---
+
+## M6 — CSV import
+
+> **Goal:** A robust CSV import — parse, map columns, validate, preview, and commit — for subscriptions, income, and expenses, with **real automated tests** (Substimate's import lacked them). (See: [`./02-product-spec.md`](./02-product-spec.md), [`./11-substimate-analysis.md`](./11-substimate-analysis.md).)
+
+### M6-IMPORT — CSV import
+
+- [ ] **M6-IMPORT-01** — Implement a **pure CSV parser** in `Shared`/`Domain`: RFC-4180-style quoting, delimiter detection, encoding detection (UTF-8/UTF-16/Latin-1), header mapping, locale-aware number + date parsing into `Int64` minor units. Heavily unit-tested (malformed rows, BOM, quotes, mixed delimiters, negative amounts). (see: [`./11-substimate-analysis.md`](./11-substimate-analysis.md) — Substimate lacked these tests)
+- [ ] **M6-IMPORT-02** — Build the **column-mapping UI**: user maps CSV columns to target fields (name, amount, currency, date → `spent_on` for variable expenses, category) with a remembered mapping per import type. (dep: M6-IMPORT-01)
+- [ ] **M6-IMPORT-03** — Build the **validation + preview** step: show parsed rows, flag invalid ones (required fields, name 1–120 chars, currency ∈ allowed set, amount/date parse, duplicate detection), let the user fix or skip before commit. (dep: M6-IMPORT-02)
+- [ ] **M6-IMPORT-04** — Implement **commit on import**: batch optimistic writes via the repositories with progress + rollback on partial failure; never pre-convert currency on import (store native). (dep: M6-IMPORT-03, M2-DATA-04, M1-DOMAIN-01)
+- [ ] **M6-IMPORT-05** — File picker integration (`fileImporter`) restricted to `.csv`/text; handle large files off the main actor. (dep: M6-IMPORT-01)
+- [ ] **M6-IMPORT-06** — End-to-end import tests using fixture CSVs (clean, dirty, multi-currency, huge). (dep: M6-IMPORT-04)
+
+---
+
+## M7 — Polish, accessibility, performance & Liquid Glass refinement
+
+> **Goal:** Make it Apple-grade: finish the single Liquid Glass design language across every surface, complete the full Settings + customizable-dashboard surfaces, finish accessibility, and meet performance budgets — once all feature surfaces exist. (See: [`./06-design-system.md`](./06-design-system.md), [`./09-engineering-practices.md`](./09-engineering-practices.md).)
+
+### M7-PERF — Performance & polish
+
+- [ ] **M7-PERF-01** — Profile cold launch, list scrolling, and chart rendering; eliminate main-actor stalls; ensure heavy parsing/aggregation runs off the main actor.
+- [ ] **M7-PERF-02** — Full **Liquid Glass polish** on iOS 26: `GlassEffectContainer` grouping, `glassEffectID` morph transitions, scroll-edge effects, motion + haptics. Verify the Materials fallback path still looks cohesive on iOS 18–25. (dep: M0-DS-02)
+- [ ] **M7-PERF-03** — Empty states, loading skeletons, and error states for every pillar.
+- [ ] **M7-PERF-04** — Verify offline behavior end-to-end: airplane-mode reads, queued writes, sync-on-reconnect, conflict resolution (last-write-wins per field, with Realtime as the latency optimization over delta-poll). (dep: M0-DATA-11)
+
+### M7-DS — Design-consistency sweep
+
+- [ ] **M7-DS-01** — Design-consistency sweep against [`./06-design-system.md`](./06-design-system.md): no ad-hoc colors/spacing; every component from `DesignSystem`; verified light/dark/system across every screen; **no remnants of Substimate's 9 themes** (single Liquid Glass language only, ADR-0009). (see: [`./12-decisions-adr.md`](./12-decisions-adr.md))
+- [ ] **M7-DS-02** — Finalize iconography (SF Symbols + the bespoke symbols decided in INBOX-02) and ensure the default-category icon set matches the 18 canonical categories. (dep: M0-DS-01)
+
+### M7-SET — Settings & preferences
+
+- [ ] **M7-SET-01** — Migration: `user_preferences` (`appearance, biometric_lock_enabled, default_currency`, …) + RLS **enabled and forced**; `PreferencesRepository` real impl in `DataLayer`. **Note:** dashboard card ordering lives in its own `dashboard_layouts.card_order` table (M0-DATA-13), **not** a `user_preferences.dashboard_layout` column. (see: [`./05-data-model.md`](./05-data-model.md#user_preferences))
+- [ ] **M7-SET-02** — Settings UI: appearance (system/light/dark) applied app-wide; default + display currency; biometric-lock toggle + timeout; notification prefs. (dep: M7-SET-01)
+- [ ] **M7-SET-03** — **Account deletion** flow (invokes the `delete-account` Edge Function for server-side deletion + local purge) and **data export** (CSV/JSON) inside the app — App Store requirements. (dep: M7-SET-01, M0-BACK-07, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md), [§M8-STORE](#m8-store--app-store-preparation))
+- [ ] **M7-SET-04** — Privacy controls: clear caches, view what data is stored. (dep: M7-SET-01)
+
+### M7-HOME — Customizable dashboard (full framework)
+
+- [ ] **M7-HOME-01** — Wire the full dashboard framework to the canonical `dashboard_layouts.card_order` store (the M0-DATA-13 table; `cardOrder: [String]`). The schema already exists from M0; there is **no** `user_preferences.dashboard_layout` alternative. This task hardens the read/write path and migrates the M1-HOME seed to the full card registry. (dep: M0-DATA-13, M1-HOME-01, see: [`./05-data-model.md`](./05-data-model.md#dashboardlayout))
+- [ ] **M7-HOME-02** — Build the **dashboard card framework**: a registry of cards (spend summary, upcoming charges, net cash flow, top categories, portfolio, BTC price) each backed by an existing analytics function. (dep: M1-SUBS-07, M2-CASH-05, M5-ASSET-03)
+- [ ] **M7-HOME-03** — Implement **drag-to-reorder + show/hide** of cards, persisted to the layout. (dep: M7-HOME-01, M7-HOME-02)
+- [ ] **M7-HOME-04** — Home store tests + snapshot tests of cards. (dep: M7-HOME-02, M1-TEST-02)
+
+### M7-A11Y — Accessibility pass (cross-app)
+
+- [ ] **M7-A11Y-01** — Audit every screen for **Dynamic Type** up to XXL without truncation/overlap; fix offenders. (cont from M1-DS)
+- [ ] **M7-A11Y-02** — Add/verify **VoiceOver labels, hints, and traits** on all interactive elements and charts. (dep: M3-FLOW-04)
+- [ ] **M7-A11Y-03** — Honor **Reduce Motion** and **Increase Contrast** across animations and glass surfaces. (dep: M0-DS-02)
+- [ ] **M7-A11Y-04** — Verify color-contrast ratios for text on glass/material surfaces in light + dark. (dep: M0-DS-01)
+
+---
+
+## M8 — Hardening, TestFlight beta & App Store submission
+
+> **Goal:** Production readiness: a full security review, an external TestFlight beta, App Store metadata + privacy nutrition label, and submission. (See: [`./07-security-and-privacy.md`](./07-security-and-privacy.md), [`./09-engineering-practices.md`](./09-engineering-practices.md).)
+
+### M8-SEC — Security hardening & review
+
+- [ ] **M8-SEC-01** — Full **RLS audit**: every table has RLS **enabled AND forced** with owner-only policies; confirm the CI DB/RLS regression gate (M0-CI-06) asserts this on every table and fails if any table lacks it. (dep: all `*-DATA-*` migrations, M0-CI-06)
+- [ ] **M8-SEC-02** — Audit every **`SECURITY DEFINER` function** against the hardening checklist (`SET search_path = public`, `REVOKE ALL ON FUNCTION … FROM PUBLIC`, `GRANT EXECUTE TO authenticated` for client-callable RPCs only, no caller-supplied uid, per-row owner check; trigger/helper functions NOT granted to `authenticated`). (dep: M0-SEC-05)
+- [ ] **M8-SEC-03** — Audit the **`delete-account` Edge Function**: confirm it derives uid from the verified JWT via `auth.getUser()`, ignores any body-supplied id, rejects requests without a valid bearer JWT, and uses the service-role client only for `auth.admin.deleteUser`. (dep: M0-BACK-07, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md) §9.3)
+- [ ] **M8-SEC-04** — Finalize the **biometric app lock**: configurable timeout, re-prompt on foreground, fallback to passcode. (dep: M0-SEC-06)
+- [ ] **M8-SEC-05** — *(Optional)* certificate pinning for the Supabase host; document the rotation plan. (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M8-SEC-06** — Verify **no PII or amounts** appear in OSLog output or crash logs; add a redaction test. (dep: M0-SEC-03)
+- [ ] **M8-SEC-07** — Run a dependency vulnerability sweep and resolve advisories. (dep: M0-CI-05)
+- [ ] **M8-SEC-08** — Stand up **backups & disaster recovery** for production: move prod to **Supabase Pro** with **daily backups + Point-in-Time Recovery (≥7-day retention)**. Adopt a **forward-only** migration policy with a tested rollback/forward-fix procedure, and **take a fresh backup/snapshot immediately before any destructive prod migration**. Write the short **restore runbook** (identify timestamp → PITR-restore to a fork → verify → cut over) and store it with the ops docs. Mirrors [`./07-security-and-privacy.md`](./07-security-and-privacy.md) §13 and the docs/08 "data-loss / bad-migration" risk; see also ADR-0018 (Supabase plan & scaling posture). (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md) §13, [`./12-decisions-adr.md`](./12-decisions-adr.md) — ADR-0018)
+
+### M8-TEST — Test coverage & UI tests
+
+- [ ] **M8-TEST-01** — Author **XCUITest** flows for the critical paths: sign-in, add subscription, import CSV, view cash flow, run the BTC calculator. (dep: feature milestones)
+- [ ] **M8-TEST-02** — Raise unit-test coverage on all pure logic (money, currency, analytics, CSV, occurrence projection, Sankey) to the bar in [`./09-engineering-practices.md`](./09-engineering-practices.md).
+- [ ] **M8-TEST-03** — Add a CI coverage report + threshold gate.
+
+### M8-STORE — App Store preparation
+
+- [ ] **M8-STORE-01** — Set up **Fastlane** lanes (`test`, `beta`, `release`) and **TestFlight** distribution (external beta group); document Xcode Cloud as the alternative. (dep: M0-CI-01)
+- [ ] **M8-STORE-02** — Configure signing (App Store Connect API key in CI secrets, never in repo), bundle id, app icons, launch screen.
+- [ ] **M8-STORE-03** — Author the **App Privacy nutrition label** accurately (data collected, linkage, tracking = none); no third-party trackers. (see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md))
+- [ ] **M8-STORE-04** — Verify **account deletion + data export** are reachable in-app (App Store requirement). (dep: M7-SET-03)
+- [ ] **M8-STORE-05** — Screenshots, App Store description, keywords, support URL (`support@finmate.app` — **owner to confirm**), and the **live** privacy-policy + Terms URLs (`https://finmate.app/privacy`, `https://finmate.app/terms` — **owner to confirm domain**, finalized in M8-STORE-08). (dep: M8-STORE-08)
+- [ ] **M8-STORE-06** — Pre-submission checklist: ATS, permission-string `Info.plist` keys (Face ID `NSFaceIDUsageDescription`), age rating, export-compliance.
+- [ ] **M8-STORE-07** — Run the **external TestFlight beta**: recruit testers, collect crash/feedback, triage and fix P0/P1 blockers; keep a beta-feedback log with resolutions. (dep: M8-STORE-01)
+- [ ] **M8-STORE-08** — Finalize the **legal & policy documents**: publish the submission-ready Privacy Policy and Terms of Service **live** at their stable URLs (`https://finmate.app/privacy`, `https://finmate.app/terms` — **owner to confirm domain**), versioned in the repo `legal/` directory and owned by the product owner. Confirm each meets its minimum-content checklist (data collected/retained, deletion + export rights, contact). **Both must be live before submission.** Completes the M0-SEC-07 stub → M8 final dependency. (dep: M0-SEC-07, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md) §9, blocks: M8-STORE-05)
+
+---
+
+## 13. Cross-cutting epic index
+
+These epics span milestones; use this index to find all of an epic's tasks at a glance. Each task is filed under the **earliest milestone where its work first lands** (see [§1](#1-milestone-mapping-mirrors-08-roadmap-and-milestonesmd-2)).
+
+| Epic | Code | Where it lands | Lead doc |
+|------|------|----------------|----------|
+| Project & tooling | `PROJ` | M0 | [`./03-architecture.md`](./03-architecture.md) |
+| Design system | `DS` | M0, M1, M3, M7 | [`./06-design-system.md`](./06-design-system.md) |
+| Data layer & sync | `DATA` | M0, M1, M2, M4, M5 | [`./03-architecture.md`](./03-architecture.md), [`./05-data-model.md`](./05-data-model.md) |
+| Backend / Edge Functions | `BACK` | M0, M5 | [`./05-data-model.md`](./05-data-model.md) |
+| Auth & onboarding | `AUTH` | M0 | [`./07-security-and-privacy.md`](./07-security-and-privacy.md) |
+| Security & privacy | `SEC` | M0, M8 | [`./07-security-and-privacy.md`](./07-security-and-privacy.md) |
+| Testing infrastructure | `TEST` | M1, M8 | [`./09-engineering-practices.md`](./09-engineering-practices.md) |
+| CI/CD | `CI` | M0, M8 | [`./09-engineering-practices.md`](./09-engineering-practices.md) |
+| Accessibility | `A11Y` | M7, M8 | [`./06-design-system.md`](./06-design-system.md) |
+| App Store prep | `STORE` | M8 | [`./07-security-and-privacy.md`](./07-security-and-privacy.md) |
+
+---
+
+## 14. Foundational surfaces vs. product pillars
+
+Per the Canonical Decisions Brief, Finmate has **nine canonical product pillars**: (1) subscriptions + analytics, (2) income & expenses, (3) cost-tracker money-flow, (4) payday calendar, (5) CSV import, (6) assets/investments, (7) crypto/BTC calculator, (8) multi-currency, (9) settings/theming. **Auth/Onboarding** and **Home/Dashboard** are **foundational surfaces**, not counted among the nine pillars — which is why their tasks (`M0-AUTH-*`, `M1-HOME-*`/`M7-HOME-*`) fold into the milestones rather than forming pillar milestones of their own.
+
+---
+
+## 15. Discovered work / inbox
+
+> Park newly discovered tasks here when you don't yet know their milestone. Triage them into the right milestone in a follow-up PR. Keep this list short — it is an inbox, not a graveyard.
+
+- [ ] **INBOX-01** — Decide the typed-navigation `Route` enum shape per feature vs. a single app-wide route type; record in an ADR before M0-PROJ-08 hardens. (see: [`./03-architecture.md`](./03-architecture.md))
+- [ ] **INBOX-02** — Choose the icon strategy: which bespoke symbols are needed beyond SF Symbols, and where they live in `DesignSystem`. (see: [`./06-design-system.md`](./06-design-system.md))
+- [x] **INBOX-03** — *(Settled — see M0-DATA-11.)* Supabase Realtime **is in v1** (ADR-0014) as a **latency optimization** layered over the delta-poll-by-`updated_at` sync baseline; delta-poll remains the correctness/offline fallback. No open question remains. (see: [`./03-architecture.md`](./03-architecture.md), [`./12-decisions-adr.md`](./12-decisions-adr.md) — ADR-0014)
+
+---
+
+## Maintaining this backlog
+
+- [ ] When you open a PR, reference the task ID in the title (e.g. `feat(subscriptions): add edit form [M1-SUBS-03]`).
+- [ ] When a task is merged, check it off **in the same PR** and note follow-ups in [§15](#15-discovered-work--inbox).
+- [ ] When scope changes, mark superseded tasks `[-]` with a one-line reason and add the replacement with a new ID; do not reuse IDs.
+- [ ] Keep the [§1 milestone mapping](#1-milestone-mapping-mirrors-08-roadmap-and-milestonesmd-2) and milestone goals in sync with [`./08-roadmap-and-milestones.md`](./08-roadmap-and-milestones.md); if they drift, the roadmap is authoritative for sequencing and the Canonical Decisions Brief is authoritative for scope.
+- [ ] Re-read the Definition of Done in [`./09-engineering-practices.md`](./09-engineering-practices.md) before checking anything off.
+
+---
+
+## Related documents
+
+- [`./08-roadmap-and-milestones.md`](./08-roadmap-and-milestones.md) — the M0–M8 milestone definitions this backlog is organized around (authoritative for sequencing).
+- [`./02-product-spec.md`](./02-product-spec.md) — the features, flows, and acceptance criteria each feature task implements.
+- [`./03-architecture.md`](./03-architecture.md) — module graph, repositories (protocols in `Domain`, implementations in `DataLayer`), sync engine, and navigation referenced throughout.
+- [`./05-data-model.md`](./05-data-model.md) — the normative schema, field names, RLS/FORCE, and migrations behind every `*-DATA-*` task.
+- [`./07-security-and-privacy.md`](./07-security-and-privacy.md) — the normative security posture behind every `*-SEC-*` task.
+- [`./09-engineering-practices.md`](./09-engineering-practices.md) — the Definition of Done, testing strategy, and CI gates (incl. the §5 DB/RLS regression gate) a task must satisfy.
+- [`./12-decisions-adr.md`](./12-decisions-adr.md) — the binding ADRs referenced throughout (ADR-0005 money, ADR-0006 offline cache, ADR-0009 single glass language, ADR-0010 Edge market data, ADR-0011 Sankey, ADR-0012 conflict resolution, ADR-0013 local notifications, ADR-0014 Realtime, ADR-0015 average-cost basis).
+- [`../CLAUDE.md`](../CLAUDE.md) — the single source of truth, golden rules, and agent working agreements.
