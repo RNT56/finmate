@@ -9,8 +9,14 @@ import {
   monthlyIncomeMinor,
   type CashFlowMetrics,
 } from '../../core/cashflow';
-import type { CashFlowRepository, FixedExpense, IncomeSource, VariableExpense } from './types';
-import { fixedMonthlyAmountMinor } from './types';
+import type {
+  CashFlowRepository,
+  ExpenseCategory,
+  FixedExpense,
+  IncomeSource,
+  VariableExpense,
+} from './types';
+import { categoryNameFor, fixedMonthlyAmountMinor } from './types';
 import { InMemoryCashFlowRepository } from './repository';
 import { getRepositories } from '../../lib/repositories';
 import { useSubscriptions } from '../subscriptions/useSubscriptions';
@@ -30,6 +36,10 @@ export interface UseCashFlow {
   variableMinor: number;
   subscriptionsMinor: number;
   breakdown: ExpenseBreakdownRow[];
+  /** Expense categories for the form select + display resolution (ADR-0022). */
+  expenseCategories: ExpenseCategory[];
+  /** Resolve a `categoryId → name` ("Uncategorized" fallback) for row labels. */
+  categoryName: (id: string | null) => string;
   displayCurrency: CurrencyCode;
 
   addIncome: (income: IncomeSource) => Promise<void>;
@@ -48,6 +58,7 @@ export function useCashFlow(
   const [incomes, setIncomes] = useState<IncomeSource[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [variableExpenses, setVariableExpenses] = useState<VariableExpense[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Subscriptions monthly roll-up comes from the shared M1 store (same sample data).
@@ -56,14 +67,16 @@ export function useCashFlow(
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [inc, fix, vari] = await Promise.all([
+    const [inc, fix, vari, cats] = await Promise.all([
       repository.incomes(),
       repository.fixedExpenses(),
       repository.variableExpenses(),
+      repository.expenseCategories(),
     ]);
     setIncomes(inc);
     setFixedExpenses(fix);
     setVariableExpenses(vari);
+    setExpenseCategories(cats);
     setLoading(false);
   }, [repository]);
 
@@ -142,6 +155,11 @@ export function useCashFlow(
     [incomeMinor, expenseMinor],
   );
 
+  const categoryName = useCallback(
+    (id: string | null) => categoryNameFor(id, expenseCategories),
+    [expenseCategories],
+  );
+
   const breakdown = useMemo<ExpenseBreakdownRow[]>(
     () =>
       [
@@ -164,6 +182,8 @@ export function useCashFlow(
     variableMinor,
     subscriptionsMinor,
     breakdown,
+    expenseCategories,
+    categoryName,
     displayCurrency: DISPLAY_CURRENCY,
     addIncome,
     removeIncome,

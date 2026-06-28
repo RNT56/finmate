@@ -52,7 +52,7 @@ const fixed: FixedExpense = {
   amountMinor: 120000,
   currency: 'EUR',
   billingPeriod: 'monthly',
-  categoryName: 'Housing',
+  categoryId: '00000000-0000-0000-0000-0000000000C1',
   dueDate: '2026-07-01',
 };
 
@@ -61,7 +61,7 @@ const variable: VariableExpense = {
   name: 'Groceries',
   amountMinor: 4567,
   currency: 'EUR',
-  categoryName: 'Food',
+  categoryId: '00000000-0000-0000-0000-0000000000C2',
   spentOn: '2026-06-15',
 };
 

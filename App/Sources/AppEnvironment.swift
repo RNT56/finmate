@@ -48,11 +48,9 @@ actor InMemoryCategoryRepository: CategoryRepository {
                 Domain.Category(name: "Other", slug: "other", kind: .subscription, isProtected: true),
             ]
         case .expense:
-            return [
-                Domain.Category(name: "Housing", slug: "housing", kind: .expense),
-                Domain.Category(name: "Food", slug: "food", kind: .expense),
-                Domain.Category(name: "Other", slug: "other", kind: .expense, isProtected: true),
-            ]
+            // The same stable rows the sample expenses reference by id (ADR-0022),
+            // so `categoryID → name` resolution works offline.
+            return SampleData.expenseCategories
         }
     }
 }

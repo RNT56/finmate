@@ -14,7 +14,8 @@ export interface EntityFormDraft {
   currency: CurrencyCode;
   /** Income frequency OR expense billing period, depending on the entity. */
   cadence: IncomeFrequency | BillingPeriod;
-  categoryName: string;
+  /** Selected category id (FK to `categories`); '' = uncategorized. */
+  categoryId: string;
   /** ISO date string (anchor / due / spent-on); '' = unscheduled where allowed. */
   date: string;
 }
@@ -89,7 +90,7 @@ export function buildFixed(
       amountMinor: parsed.value.minor,
       currency: draft.currency,
       billingPeriod: draft.cadence as BillingPeriod,
-      categoryName: draft.categoryName.trim() || 'Other',
+      categoryId: draft.categoryId.trim() === '' ? null : draft.categoryId,
       dueDate: draft.date.trim() === '' ? null : draft.date,
     },
   };
@@ -110,7 +111,7 @@ export function buildVariable(
       name: parsed.value.name,
       amountMinor: parsed.value.minor,
       currency: draft.currency,
-      categoryName: draft.categoryName.trim() || 'Other',
+      categoryId: draft.categoryId.trim() === '' ? null : draft.categoryId,
       spentOn: draft.date.trim() === '' ? today : draft.date,
     },
   };

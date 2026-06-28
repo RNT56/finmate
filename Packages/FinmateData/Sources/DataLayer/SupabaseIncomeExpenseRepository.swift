@@ -50,6 +50,7 @@ struct FixedExpenseDTO: Codable, Sendable {
     let name: String
     let amountMinor: Int64
     let currency: String
+    let categoryID: UUID?
     let frequency: String
     let dueDate: String?
     let autopay: Bool
@@ -58,6 +59,7 @@ struct FixedExpenseDTO: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, name, currency, frequency, autopay, notes
         case amountMinor = "amount_minor"
+        case categoryID = "category_id"
         case dueDate = "due_date"
     }
 
@@ -66,6 +68,7 @@ struct FixedExpenseDTO: Codable, Sendable {
         name = e.name
         amountMinor = e.amountMinor
         currency = e.currency.rawValue
+        categoryID = e.categoryID
         // Schema CHECK allows monthly/quarterly/yearly; weekly maps to monthly.
         frequency = (e.frequency == .weekly ? .monthly : e.frequency).rawValue
         dueDate = e.dueDate.map(SupabaseCoding.dayString)
@@ -79,7 +82,7 @@ struct FixedExpenseDTO: Codable, Sendable {
             name: name,
             amountMinor: amountMinor,
             currency: CurrencyCode(rawValue: currency) ?? .eur,
-            category: nil,
+            categoryID: categoryID,
             frequency: BillingPeriod(rawValue: frequency) ?? .monthly,
             dueDate: SupabaseCoding.date(fromDay: dueDate),
             autopay: autopay,
@@ -95,12 +98,14 @@ struct VariableExpenseDTO: Codable, Sendable {
     let name: String
     let amountMinor: Int64
     let currency: String
+    let categoryID: UUID?
     let spentOn: String
     let notes: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, currency, notes
         case amountMinor = "amount_minor"
+        case categoryID = "category_id"
         case spentOn = "spent_on"
     }
 
@@ -109,6 +114,7 @@ struct VariableExpenseDTO: Codable, Sendable {
         name = e.name
         amountMinor = e.amountMinor
         currency = e.currency.rawValue
+        categoryID = e.categoryID
         spentOn = SupabaseCoding.dayString(e.date)
         notes = e.notes
     }
@@ -119,7 +125,7 @@ struct VariableExpenseDTO: Codable, Sendable {
             name: name,
             amountMinor: amountMinor,
             currency: CurrencyCode(rawValue: currency) ?? .eur,
-            category: nil,
+            categoryID: categoryID,
             date: SupabaseCoding.date(fromDay: spentOn) ?? .now,
             notes: notes
         )
