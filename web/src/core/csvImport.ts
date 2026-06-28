@@ -866,3 +866,92 @@ export const SAMPLE_VARIABLE_EXPENSE_CSV = `name,amount,currency,category,spent_
 Groceries,45.20,EUR,Groceries,2026-06-10
 Lunch,12.50,EUR,Dining,2026-06-15
 Misc,abc,EUR,Other,2026-06-16`;
+
+// ===========================================================================
+// MARK: - Duplicate detection (docs/13 §9; M6 follow-up)
+//
+// A PURE, additive helper shared with the Swift core (MATCHING vectors). Given a
+// list of valid rows (each carrying name + amountMinor + currency) and an optional
+// set of EXISTING entity keys, flag the rows that look like duplicates — either
+// another valid row earlier in the SAME file, or a row matching an existing entity.
+// The hint is ADVISORY: importing all valid rows stays the default; the UI offers an
+// "import non-duplicates only" affordance. Nothing here mutates the ImportPreview.
+// ===========================================================================
+
+/** The minimal shape a row needs for duplicate detection. */
+export interface DedupeCandidate {
+  name: string;
+  amountMinor: number;
+  currency: CurrencyCode;
+}
+
+/**
+ * The canonical dedupe key for a row: `name|amountMinor|currency`, with the name
+ * lowercased + trimmed (whitespace collapsed) and the currency uppercased. Same
+ * formula on Swift + web so existing-key sets are portable across the boundary.
+ */
+export function dedupeKey(name: string, amountMinor: number, currency: CurrencyCode): string {
+  const normName = name.trim().toLowerCase().replace(/\s+/g, ' ');
+  return `${normName}|${amountMinor}|${currency.toUpperCase()}`;
+}
+
+/** Why a row was flagged: it matches an existing entity, an earlier CSV row, or both. */
+export type DuplicateReason = 'existing' | 'within-csv' | 'both';
+
+/** A flagged row: its 0-based index into the input `rows`, its key, and the reason. */
+export interface DuplicateFlag {
+  /** 0-based index into the `rows` array passed to `detectDuplicates`. */
+  index: number;
+  key: string;
+  reason: DuplicateReason;
+}
+
+export interface DuplicateReport {
+  /** Flags in input order, one per row that is a likely duplicate. */
+  flags: DuplicateFlag[];
+  /** The flagged 0-based indices, for quick membership checks (`flaggedIndices.has(i)`). */
+  flaggedIndices: Set<number>;
+  /** Total number of flagged rows (`flags.length`). */
+  count: number;
+}
+
+/**
+ * Detect likely-duplicate rows among `rows`. A row is flagged when its dedupe key
+ * matches (a) an entry in `existingKeys` (an existing entity → reason `existing`),
+ * and/or (b) an EARLIER row in `rows` with the same key (→ reason `within-csv`).
+ * The FIRST occurrence of an in-CSV key is NOT flagged for that reason (only the
+ * later repeats), so importing without the flagged rows keeps one copy. A row that
+ * is both an existing match and a later repeat gets reason `both`.
+ *
+ * Pure: never mutates inputs. Returns flags in input order.
+ */
+export function detectDuplicates(
+  rows: readonly DedupeCandidate[],
+  existingKeys: ReadonlySet<string> = new Set()
+): DuplicateReport {
+  const flags: DuplicateFlag[] = [];
+  const flaggedIndices = new Set<number>();
+  const seen = new Set<string>();
+
+  rows.forEach((row, index) => {
+    const key = dedupeKey(row.name, row.amountMinor, row.currency);
+    const matchesExisting = existingKeys.has(key);
+    const matchesEarlier = seen.has(key);
+    seen.add(key);
+
+    if (!matchesExisting && !matchesEarlier) return;
+    const reason: DuplicateReason =
+      matchesExisting && matchesEarlier ? 'both' : matchesExisting ? 'existing' : 'within-csv';
+    flags.push({ index, key, reason });
+    flaggedIndices.add(index);
+  });
+
+  return { flags, flaggedIndices, count: flags.length };
+}
+
+/** Build an existing-keys set from any entities carrying name + amountMinor + currency. */
+export function existingKeySet(entities: readonly DedupeCandidate[]): Set<string> {
+  const set = new Set<string>();
+  for (const e of entities) set.add(dedupeKey(e.name, e.amountMinor, e.currency));
+  return set;
+}

@@ -114,23 +114,58 @@ enum ImportKind: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+// MARK: - Remembered column mappings (per import kind)
+//
+// Persists the last user-confirmed canonicalKey→columnIndex mapping per import kind so
+// the next import of that type can pre-apply it (seeding over alias auto-detect). Backed
+// by `UserDefaults`; test-safe (missing/garbage values decode to `nil`, never crash).
+struct RememberedMappings {
+    private let defaults: UserDefaults
+    private static let keyPrefix = "finmate.import.mapping."
+
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+    private func key(for kind: ImportKind) -> String { Self.keyPrefix + kind.rawValue }
+
+    /// The remembered mapping for `kind`, or `nil` if none was saved (or it can't decode).
+    func mapping(for kind: ImportKind) -> [String: Int]? {
+        guard let data = defaults.data(forKey: key(for: kind)),
+              let decoded = try? JSONDecoder().decode([String: Int].self, from: data)
+        else { return nil }
+        return decoded
+    }
+
+    /// Persist `mapping` as the last-used mapping for `kind`. Silently no-ops on encode
+    /// failure (never throws / crashes).
+    func save(_ mapping: [String: Int], for kind: ImportKind) {
+        guard let data = try? JSONEncoder().encode(mapping) else { return }
+        defaults.set(data, forKey: key(for: kind))
+    }
+}
+
 // MARK: - Typed preview row (uniform for the preview UI across kinds)
 
 /// A flattened, kind-agnostic view of one valid imported row for the preview list.
+/// `isDuplicate` marks an advisory (skippable) likely-duplicate flag.
 private struct PreviewRow: Identifiable {
     let id = UUID()
     let title: String
     let subtitle: String
     let amount: Money
+    var isDuplicate: Bool = false
 }
 
 /// The valid rows + errors + total, plus the destination kind. Kept type-erased so the
-/// preview UI is shared; the actual typed valid arrays live in `PendingImport`.
+/// preview UI is shared; the actual typed valid arrays live in `PendingImport`. The
+/// `flaggedIndices` set (into `rows`) marks likely duplicates surfaced as advisory hints.
 private struct UnifiedPreview {
     let rows: [PreviewRow]
     let errors: [ImportRowError]
     let totalRows: Int
+    var flaggedIndices: Set<Int> = []
     var validCount: Int { rows.count }
+    var duplicateCount: Int { flaggedIndices.count }
+    var nonDuplicateCount: Int { validCount - duplicateCount }
 }
 
 /// The typed valid rows captured at preview time, ready to write on import.
@@ -174,6 +209,9 @@ struct ImportView: View {
     // File picker
     @State private var isImportingFile = false
     @State private var fileError: String?
+
+    // Remembered last-used mapping per import kind.
+    private let rememberedMappings = RememberedMappings()
 
     var body: some View {
         ScrollView {
@@ -317,7 +355,15 @@ struct ImportView: View {
     private func analyzeHeader() {
         let (h, m) = Self.analyze(kind: kind, text: csvText)
         headers = h
-        mapping = m
+        // Seed from alias auto-detect, then OVERRIDE with the last-used mapping for this
+        // kind where those columns still exist in the current header (remembered mappings).
+        var seeded = m
+        if let remembered = rememberedMappings.mapping(for: kind) {
+            for (key, idx) in remembered where idx >= 0 && idx < h.count {
+                seeded[key] = idx
+            }
+        }
+        mapping = seeded
         headerAnalyzed = !h.isEmpty
         preview = nil
         pending = nil
@@ -379,39 +425,62 @@ struct ImportView: View {
             let m = typedMapping(SubscriptionCSVImporter.CSVField.self)
             let p = SubscriptionCSVImporter.parse(csvText, mapping: m)
             pending = .subscriptions(p.valid)
-            preview = UnifiedPreview(
-                rows: p.valid.map { PreviewRow(title: $0.name,
-                                               subtitle: $0.billingPeriod.rawValue.capitalized,
-                                               amount: Money(minorUnits: $0.amountMinor, currency: $0.currency)) },
-                errors: p.errors, totalRows: p.totalRows)
+            let scan = ImportDuplicateDetector.findDuplicates(
+                p.valid, existingKeys: ImportDuplicateDetector.keys(for: store.subscriptions))
+            preview = makePreview(p.valid, scan: scan, errors: p.errors, totalRows: p.totalRows) {
+                PreviewRow(title: $0.name,
+                           subtitle: $0.billingPeriod.rawValue.capitalized,
+                           amount: Money(minorUnits: $0.amountMinor, currency: $0.currency))
+            }
         case .income:
             let m = typedMapping(IncomeCSVImporter.CSVField.self)
             let p = IncomeCSVImporter.parse(csvText, mapping: m)
             pending = .income(p.valid)
-            preview = UnifiedPreview(
-                rows: p.valid.map { PreviewRow(title: $0.name,
-                                               subtitle: $0.frequency.rawValue.capitalized,
-                                               amount: Money(minorUnits: $0.amountMinor, currency: $0.currency)) },
-                errors: p.errors, totalRows: p.totalRows)
+            let scan = ImportDuplicateDetector.findDuplicates(
+                p.valid, existingKeys: ImportDuplicateDetector.keys(for: cashFlowStore?.income ?? []))
+            preview = makePreview(p.valid, scan: scan, errors: p.errors, totalRows: p.totalRows) {
+                PreviewRow(title: $0.name,
+                           subtitle: $0.frequency.rawValue.capitalized,
+                           amount: Money(minorUnits: $0.amountMinor, currency: $0.currency))
+            }
         case .fixedExpenses:
             let m = typedMapping(FixedExpenseCSVImporter.CSVField.self)
             let p = FixedExpenseCSVImporter.parse(csvText, mapping: m, categories: cats)
             pending = .fixed(p.valid)
-            preview = UnifiedPreview(
-                rows: p.valid.map { PreviewRow(title: $0.name,
-                                               subtitle: categoryName($0.categoryID),
-                                               amount: Money(minorUnits: $0.amountMinor, currency: $0.currency)) },
-                errors: p.errors, totalRows: p.totalRows)
+            let scan = ImportDuplicateDetector.findDuplicates(
+                p.valid, existingKeys: ImportDuplicateDetector.keys(for: cashFlowStore?.fixedExpenses ?? []))
+            preview = makePreview(p.valid, scan: scan, errors: p.errors, totalRows: p.totalRows) {
+                PreviewRow(title: $0.name,
+                           subtitle: categoryName($0.categoryID),
+                           amount: Money(minorUnits: $0.amountMinor, currency: $0.currency))
+            }
         case .variableExpenses:
             let m = typedMapping(VariableExpenseCSVImporter.CSVField.self)
             let p = VariableExpenseCSVImporter.parse(csvText, mapping: m, categories: cats)
             pending = .variable(p.valid)
-            preview = UnifiedPreview(
-                rows: p.valid.map { PreviewRow(title: $0.name,
-                                               subtitle: categoryName($0.categoryID),
-                                               amount: Money(minorUnits: $0.amountMinor, currency: $0.currency)) },
-                errors: p.errors, totalRows: p.totalRows)
+            let scan = ImportDuplicateDetector.findDuplicates(
+                p.valid, existingKeys: ImportDuplicateDetector.keys(for: cashFlowStore?.variableExpenses ?? []))
+            preview = makePreview(p.valid, scan: scan, errors: p.errors, totalRows: p.totalRows) {
+                PreviewRow(title: $0.name,
+                           subtitle: categoryName($0.categoryID),
+                           amount: Money(minorUnits: $0.amountMinor, currency: $0.currency))
+            }
         }
+    }
+
+    /// Build a `UnifiedPreview` from typed valid rows + a duplicate scan, marking flagged
+    /// rows as advisory likely-duplicates while keeping them in the import set by default.
+    private func makePreview<Entity>(
+        _ valid: [Entity], scan: DuplicateScan, errors: [ImportRowError], totalRows: Int,
+        row: (Entity) -> PreviewRow
+    ) -> UnifiedPreview {
+        let rows = valid.enumerated().map { idx, entity -> PreviewRow in
+            var r = row(entity)
+            r.isDuplicate = scan.isFlagged(idx)
+            return r
+        }
+        return UnifiedPreview(rows: rows, errors: errors, totalRows: totalRows,
+                              flaggedIndices: scan.flaggedIndices)
     }
 
     /// Rebuild the canonical-key mapping as a typed `[Field: Int]` for a specific
@@ -598,11 +667,30 @@ struct ImportView: View {
     private func validRowsCard(_ preview: UnifiedPreview) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Valid rows").font(.headline)
+                HStack {
+                    Text("Valid rows").font(.headline)
+                    Spacer()
+                    if preview.duplicateCount > 0 {
+                        Label("\(preview.duplicateCount) possible duplicate\(preview.duplicateCount == 1 ? "" : "s")",
+                              systemImage: "exclamationmark.arrow.triangle.2.circlepath")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                            .accessibilityLabel("\(preview.duplicateCount) possible duplicate rows")
+                    }
+                }
                 ForEach(preview.rows) { row in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(row.title).font(.subheadline.weight(.medium))
+                            HStack(spacing: 6) {
+                                Text(row.title).font(.subheadline.weight(.medium))
+                                if row.isDuplicate {
+                                    Text("Possible duplicate")
+                                        .font(.caption2.weight(.semibold))
+                                        .padding(.horizontal, 6).padding(.vertical, 2)
+                                        .background(.orange.opacity(0.18), in: Capsule())
+                                        .foregroundStyle(.orange)
+                                }
+                            }
                             Text(row.subtitle)
                                 .font(.caption).foregroundStyle(.secondary)
                         }
@@ -611,6 +699,9 @@ struct ImportView: View {
                             .font(.subheadline.monospacedDigit())
                     }
                     .accessibilityElement(children: .combine)
+                    .accessibilityLabel(
+                        "\(row.title), \(row.subtitle), \(row.amount.formatted())"
+                        + (row.isDuplicate ? ", possible duplicate" : ""))
                 }
             }
         }
@@ -641,34 +732,69 @@ struct ImportView: View {
         return err.message
     }
 
+    @ViewBuilder
     private func importButton(_ preview: UnifiedPreview) -> some View {
-        Button {
-            guard let pending else { return }
-            Task { await performImport(pending) }
-        } label: {
-            Label("Import \(preview.validCount) \(kind.singular)\(preview.validCount == 1 ? "" : "s")",
-                  systemImage: "square.and.arrow.down")
-                .frame(maxWidth: .infinity)
+        VStack(spacing: 10) {
+            // Default action: import ALL valid rows (the duplicate hint is advisory).
+            Button {
+                guard let pending else { return }
+                Task { await performImport(pending, skippingFlagged: false, in: preview) }
+            } label: {
+                Label("Import \(preview.validCount) \(kind.singular)\(preview.validCount == 1 ? "" : "s")",
+                      systemImage: "square.and.arrow.down")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(preview.validCount == 0)
+
+            // Advisory affordance: skip the flagged likely-duplicate rows.
+            if preview.duplicateCount > 0 {
+                Button {
+                    guard let pending else { return }
+                    Task { await performImport(pending, skippingFlagged: true, in: preview) }
+                } label: {
+                    Label("Import \(preview.nonDuplicateCount) non-duplicate\(preview.nonDuplicateCount == 1 ? "" : "s") only",
+                          systemImage: "line.3.horizontal.decrease.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(preview.nonDuplicateCount == 0)
+            }
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .disabled(preview.validCount == 0)
     }
 
     /// Route the typed valid rows to the matching repository (same create path as
-    /// manual add), then reset to the empty state with a success banner.
-    private func performImport(_ pending: PendingImport) async {
-        let count = pending.count
+    /// manual add), then reset to the empty state with a success banner. When
+    /// `skippingFlagged` is true, rows whose index is in `preview.flaggedIndices` (likely
+    /// duplicates) are omitted. On success the confirmed column mapping is remembered for
+    /// this import kind.
+    private func performImport(_ pending: PendingImport, skippingFlagged: Bool, in preview: UnifiedPreview) async {
+        let flagged = skippingFlagged ? preview.flaggedIndices : []
+        func keep<T>(_ rows: [T]) -> [T] {
+            rows.enumerated().filter { !flagged.contains($0.offset) }.map(\.element)
+        }
+
+        var count = 0
         switch pending {
         case .subscriptions(let rows):
-            for r in rows { await store.add(r) }
+            let kept = keep(rows); count = kept.count
+            for r in kept { await store.add(r) }
         case .income(let rows):
-            for r in rows { await cashFlowStore?.addIncome(r) }
+            let kept = keep(rows); count = kept.count
+            for r in kept { await cashFlowStore?.addIncome(r) }
         case .fixed(let rows):
-            for r in rows { await cashFlowStore?.addFixed(r) }
+            let kept = keep(rows); count = kept.count
+            for r in kept { await cashFlowStore?.addFixed(r) }
         case .variable(let rows):
-            for r in rows { await cashFlowStore?.addVariable(r) }
+            let kept = keep(rows); count = kept.count
+            for r in kept { await cashFlowStore?.addVariable(r) }
         }
+
+        // Remember the mapping for this kind on a successful import.
+        rememberedMappings.save(mapping, for: kind)
+
         resetFlow()
         csvText = ""
         importedCount = count

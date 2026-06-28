@@ -5,7 +5,7 @@
 // the valid rows via the matching repository hook (same create path as manual add). One
 // glass language; reuses GlassCard + glass tokens. Logic lives in core/csvImport.ts.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GlassCard } from '../../components/GlassCard';
 import { Page } from '../../components/AppShell';
@@ -29,11 +29,14 @@ import {
   SAMPLE_INCOME_CSV,
   SAMPLE_FIXED_EXPENSE_CSV,
   SAMPLE_VARIABLE_EXPENSE_CSV,
+  detectDuplicates,
+  existingKeySet,
   type CSVField,
   type IncomeCSVField,
   type FixedExpenseCSVField,
   type VariableExpenseCSVField,
   type ImportRowError,
+  type DuplicateReport,
 } from '../../core/csvImport';
 import type { CurrencyCode } from '../../core/currency';
 import type { ExpenseCategory } from '../cashflow/types';
@@ -162,6 +165,62 @@ const TYPE_SPECS: Record<ImportType, TypeSpec> = {
 /** Sentinel select value meaning "ignore this field" (no column mapped). */
 const IGNORE = -1;
 
+// MARK: - Remembered mappings per import type (localStorage; keyed by type)
+//
+// Persist the user's last column→field mapping for each import type and pre-apply it
+// on the next import of that type, overriding the alias auto-detect when the saved
+// mapping still resolves to a column that exists in the current header. Saved on a
+// successful import; the platform store is localStorage on web (iOS uses UserDefaults).
+
+const MAPPING_STORAGE_PREFIX = 'finmate.import.mapping.';
+
+function mappingStorageKey(type: ImportType): string {
+  return `${MAPPING_STORAGE_PREFIX}${type}`;
+}
+
+function loadRememberedMapping(type: ImportType): AnyMapping | null {
+  try {
+    const raw = localStorage.getItem(mappingStorageKey(type));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== 'object') return null;
+    const out: AnyMapping = {};
+    for (const [field, idx] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof idx === 'number' && Number.isInteger(idx) && idx >= 0) out[field] = idx;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+function saveRememberedMapping(type: ImportType, mapping: AnyMapping): void {
+  try {
+    localStorage.setItem(mappingStorageKey(type), JSON.stringify(mapping));
+  } catch {
+    // Storage unavailable / quota — remembering mappings is best-effort.
+  }
+}
+
+/**
+ * Merge a remembered mapping over the alias auto-detect for a given header. The
+ * remembered mapping wins, but only for columns that still exist in this header
+ * (so a saved index past the column count is dropped rather than mis-mapping).
+ */
+function applyRememberedMapping(
+  type: ImportType,
+  auto: AnyMapping,
+  headerCount: number
+): AnyMapping {
+  const remembered = loadRememberedMapping(type);
+  if (!remembered) return auto;
+  const merged: AnyMapping = { ...auto };
+  for (const [field, idx] of Object.entries(remembered)) {
+    if (idx < headerCount) merged[field] = idx;
+  }
+  return merged;
+}
+
 /** Analyze a header for the chosen type → the raw tokens + the seed mapping. */
 function analyzeFor(type: ImportType, text: string): { headers: string[]; autoMapping: AnyMapping } {
   switch (type) {
@@ -258,13 +317,16 @@ function parseFor(
 
 export function Import() {
   const navigate = useNavigate();
-  const { add } = useSubscriptions();
+  const { add, subscriptions } = useSubscriptions();
   const {
     addIncome,
     addFixed,
     addVariable,
     expenseCategories,
     categoryName,
+    incomes,
+    fixedExpenses,
+    variableExpenses,
   } = useCashFlow();
 
   const [importType, setImportType] = useState<ImportType>('subscriptions');
@@ -281,6 +343,29 @@ export function Import() {
   const [preview, setPreview] = useState<TypedPreview | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [imported, setImported] = useState<number | null>(null);
+  /** When on, the import action skips rows flagged as likely duplicates. */
+  const [skipDuplicates, setSkipDuplicates] = useState(false);
+
+  // Existing-entity dedupe keys for the selected type (name|amountMinor|currency).
+  // Used to flag preview rows that match an already-saved entity.
+  const existingKeys = useMemo(() => {
+    switch (importType) {
+      case 'subscriptions':
+        return existingKeySet(subscriptions);
+      case 'income':
+        return existingKeySet(incomes);
+      case 'fixed':
+        return existingKeySet(fixedExpenses);
+      case 'variable':
+        return existingKeySet(variableExpenses);
+    }
+  }, [importType, subscriptions, incomes, fixedExpenses, variableExpenses]);
+
+  // Duplicate report over the current preview rows (within-CSV + against existing).
+  const duplicates: DuplicateReport | null = useMemo(
+    () => (preview ? detectDuplicates(preview.rows, existingKeys) : null),
+    [preview, existingKeys]
+  );
 
   /** Reset everything back to the paste/empty state (keeps the chosen type). */
   const resetFlow = () => {
@@ -290,16 +375,19 @@ export function Import() {
     setHeaders([]);
     setMapping({});
     setFileError(null);
+    setSkipDuplicates(false);
   };
 
-  /** Analyze the current text's header and seed the user-overridable mapping. */
+  /** Analyze the current text's header and seed the user-overridable mapping. The
+   *  remembered mapping for this type (if any) is pre-applied over the alias detect. */
   const runAnalyze = (source: string, type: ImportType = importType) => {
     const analysis = analyzeFor(type, source);
     setHeaders(analysis.headers);
-    setMapping(analysis.autoMapping);
+    setMapping(applyRememberedMapping(type, analysis.autoMapping, analysis.headers.length));
     setHeaderAnalyzed(analysis.headers.length > 0);
     setPreview(null);
     setImported(null);
+    setSkipDuplicates(false);
   };
 
   /** Switching type re-analyzes the current text against the new type's aliases. */
@@ -364,17 +452,26 @@ export function Import() {
 
   const doImport = async () => {
     if (!preview) return;
-    const p = parseFor(importType, text, mapping, expenseCategories, categoryName);
-    const count = p.rows.length;
+    // The valid rows produced by each importer line up 1:1 with `preview.rows`
+    // (same parse, same order), so the duplicate flags index both alike. When
+    // "import non-duplicates only" is on, skip the flagged indices.
+    const flagged = skipDuplicates && duplicates ? duplicates.flaggedIndices : new Set<number>();
+    const keep = <T,>(items: T[]): T[] => items.filter((_, i) => !flagged.has(i));
+
+    let count = 0;
     switch (importType) {
       case 'subscriptions': {
         const sub = parseSubscriptionsCSVWithMapping(text, mapping as Partial<Record<CSVField, number>>);
-        for (const s of sub.valid) await add(s);
+        const rows = keep(sub.valid);
+        for (const s of rows) await add(s);
+        count = rows.length;
         break;
       }
       case 'income': {
         const inc = parseIncomeCSVWithMapping(text, mapping as Partial<Record<IncomeCSVField, number>>);
-        for (const i of inc.valid) await addIncome(i);
+        const rows = keep(inc.valid);
+        for (const i of rows) await addIncome(i);
+        count = rows.length;
         break;
       }
       case 'fixed': {
@@ -383,7 +480,9 @@ export function Import() {
           mapping as Partial<Record<FixedExpenseCSVField, number>>,
           expenseCategories
         );
-        for (const e of fx.valid) await addFixed(e);
+        const rows = keep(fx.valid);
+        for (const e of rows) await addFixed(e);
+        count = rows.length;
         break;
       }
       case 'variable': {
@@ -392,10 +491,14 @@ export function Import() {
           mapping as Partial<Record<VariableExpenseCSVField, number>>,
           expenseCategories
         );
-        for (const e of va.valid) await addVariable(e);
+        const rows = keep(va.valid);
+        for (const e of rows) await addVariable(e);
+        count = rows.length;
         break;
       }
     }
+    // Remember this type's column→field mapping for the next import of the type.
+    saveRememberedMapping(importType, mapping);
     resetFlow();
     setText('');
     setImported(count);
@@ -515,6 +618,9 @@ export function Import() {
             preview={preview}
             spec={spec}
             importedNoun={importedNoun}
+            duplicates={duplicates}
+            skipDuplicates={skipDuplicates}
+            onToggleSkipDuplicates={setSkipDuplicates}
             onImport={doImport}
           />
         )}
@@ -612,13 +718,22 @@ function PreviewSection({
   preview,
   spec,
   importedNoun,
+  duplicates,
+  skipDuplicates,
+  onToggleSkipDuplicates,
   onImport,
 }: {
   preview: TypedPreview;
   spec: TypeSpec;
   importedNoun: string;
+  duplicates: DuplicateReport | null;
+  skipDuplicates: boolean;
+  onToggleSkipDuplicates: (next: boolean) => void;
   onImport: () => void | Promise<void>;
 }) {
+  const dupCount = duplicates?.count ?? 0;
+  // How many rows actually get written, given the skip-duplicates toggle.
+  const importCount = skipDuplicates ? preview.rows.length - dupCount : preview.rows.length;
   return (
     <>
       <GlassCard>
@@ -632,11 +747,41 @@ function PreviewSection({
             type="button"
             className="fm-btn"
             onClick={() => void onImport()}
-            disabled={preview.rows.length === 0}
+            disabled={importCount === 0}
           >
-            Import {preview.rows.length} valid
+            Import {importCount} {skipDuplicates && dupCount > 0 ? 'non-duplicate' : 'valid'}
           </button>
         </div>
+
+        {dupCount > 0 && (
+          <div
+            className="fm-row"
+            style={{
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div className="fm-secondary" style={{ fontSize: 13 }} role="status">
+              {dupCount} possible duplicate{dupCount === 1 ? '' : 's'} detected (matching an existing{' '}
+              {importedNoun} or another row). Importing all rows by default — the hint is advisory.
+            </div>
+            <label
+              className="fm-row"
+              style={{ gap: 8, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}
+            >
+              <input
+                type="checkbox"
+                checked={skipDuplicates}
+                onChange={(e) => onToggleSkipDuplicates(e.target.checked)}
+                aria-label="Import non-duplicates only"
+              />
+              Import non-duplicates only
+            </label>
+          </div>
+        )}
 
         {preview.rows.length > 0 ? (
           <div style={{ overflowX: 'auto' }}>
@@ -650,14 +795,34 @@ function PreviewSection({
                 </tr>
               </thead>
               <tbody>
-                {preview.rows.map((r) => (
-                  <tr key={r.id} style={{ borderTop: '1px solid var(--fm-glass-border)' }}>
-                    <td style={cell}>{r.name}</td>
-                    <td style={cell}>{formatMoney(r.amountMinor, r.currency)}</td>
-                    {spec.hasCadence && <td style={cell}>{r.cadence ?? '—'}</td>}
-                    {spec.hasCategory && <td style={cell}>{r.category ?? 'Uncategorized'}</td>}
-                  </tr>
-                ))}
+                {preview.rows.map((r, i) => {
+                  const isDup = duplicates?.flaggedIndices.has(i) ?? false;
+                  const dimmed = isDup && skipDuplicates;
+                  return (
+                    <tr
+                      key={r.id}
+                      style={{
+                        borderTop: '1px solid var(--fm-glass-border)',
+                        opacity: dimmed ? 0.45 : 1,
+                      }}
+                    >
+                      <td style={cell}>
+                        {r.name}
+                        {isDup && (
+                          <span
+                            style={dupBadge}
+                            title="Matches an existing entry or another row in this file"
+                          >
+                            possible duplicate
+                          </span>
+                        )}
+                      </td>
+                      <td style={cell}>{formatMoney(r.amountMinor, r.currency)}</td>
+                      {spec.hasCadence && <td style={cell}>{r.cadence ?? '—'}</td>}
+                      {spec.hasCategory && <td style={cell}>{r.category ?? 'Uncategorized'}</td>}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -691,3 +856,15 @@ const cellHead: React.CSSProperties = {
   color: 'var(--fm-label-secondary)',
 };
 const cell: React.CSSProperties = { padding: '8px' };
+const dupBadge: React.CSSProperties = {
+  display: 'inline-block',
+  marginLeft: 8,
+  padding: '1px 8px',
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 600,
+  color: 'var(--fm-warning, #d97706)',
+  border: '1px solid var(--fm-warning, #d97706)',
+  verticalAlign: 'middle',
+  whiteSpace: 'nowrap',
+};
