@@ -7,3 +7,6 @@ dist-ssr
 *.local
 .DS_Store
 *.log
+
+# TypeScript incremental build cache
+*.tsbuildinfo
