@@ -82,6 +82,20 @@ public enum CashFlow {
         sources.reduce(Int64(0)) { $0 + $1.monthlyMinor }
     }
 
+    /// Recurring monthly income converted to `displayCurrency` (docs/13 §6.1/§7).
+    /// Each source's monthly-equivalent `Money` is converted **before** summing
+    /// (HALF-UP, display-only — stored amounts are never mutated); `oneTime`
+    /// excluded. Unconvertible sources are skipped rather than corrupting the total.
+    public static func monthlyIncomeMinor(
+        _ sources: [IncomeSource], displayCurrency: CurrencyCode, converter: CurrencyConverter
+    ) -> Int64 {
+        sources.reduce(Int64(0)) { acc, src in
+            let money = Money(minorUnits: src.monthlyMinor, currency: src.currency)
+            guard let converted = try? converter.convert(money, to: displayCurrency) else { return acc }
+            return acc + converted.minorUnits
+        }
+    }
+
     /// Monthly expenses = fixed (normalized) + this-month variable + subscriptions
     /// monthly-equivalent (docs/13 §6.2). Variable expenses are pre-summed by the
     /// caller for the current month; same-currency inputs assumed.
@@ -94,6 +108,18 @@ public enum CashFlow {
         return fixedMonthly + variableThisMonthMinor + subscriptionsMonthlyMinor
     }
 
+    /// Fixed expenses normalized to monthly, each converted to `displayCurrency`
+    /// before summing (docs/13 §6.2/§7, HALF-UP; stored amounts untouched).
+    public static func fixedMonthlyMinor(
+        _ fixed: [FixedExpense], displayCurrency: CurrencyCode, converter: CurrencyConverter
+    ) -> Int64 {
+        fixed.reduce(Int64(0)) { acc, exp in
+            let money = Money(minorUnits: exp.monthlyMinor, currency: exp.currency)
+            guard let converted = try? converter.convert(money, to: displayCurrency) else { return acc }
+            return acc + converted.minorUnits
+        }
+    }
+
     /// Sum of variable expenses whose `date` falls in the calendar month of `reference`.
     public static func variableThisMonthMinor(
         _ variable: [VariableExpense],
@@ -103,6 +129,24 @@ public enum CashFlow {
         variable
             .filter { calendar.isDate($0.date, equalTo: reference, toGranularity: .month) }
             .reduce(Int64(0)) { $0 + $1.amountMinor }
+    }
+
+    /// This-month variable expenses converted to `displayCurrency` per item before
+    /// summing (docs/13 §6.2/§7; stored amounts untouched).
+    public static func variableThisMonthMinor(
+        _ variable: [VariableExpense],
+        displayCurrency: CurrencyCode,
+        converter: CurrencyConverter,
+        reference: Date = .now,
+        calendar: Calendar = .current
+    ) -> Int64 {
+        variable
+            .filter { calendar.isDate($0.date, equalTo: reference, toGranularity: .month) }
+            .reduce(Int64(0)) { acc, exp in
+                let money = Money(minorUnits: exp.amountMinor, currency: exp.currency)
+                guard let converted = try? converter.convert(money, to: displayCurrency) else { return acc }
+                return acc + converted.minorUnits
+            }
     }
 
     /// Build the signed `CashFlowMetrics` (net + savings rate) from the roll-ups.
@@ -122,6 +166,45 @@ public enum CashFlow {
             subscriptionsMonthlyMinor: subscriptionsMonthlyMinor
         )
         return CashFlowMetrics(incomeMinor: incomeMinor, expenseMinor: expenseMinor)
+    }
+
+    /// Build `CashFlowMetrics` with **every** income & expense converted to
+    /// `displayCurrency` at read time before summing (docs/13 §6/§7). This both
+    /// expresses the KPIs in the display currency and *correctly* sums mixed-currency
+    /// inputs (the same-currency overload latently mis-sums those). `subscriptionsMonthlyMinor`
+    /// is expected already in the display currency (compute it via
+    /// `subscriptionsMonthlyMinor(_:displayCurrency:converter:)`). Stored amounts are
+    /// never mutated.
+    public static func metrics(
+        income: [IncomeSource],
+        fixed: [FixedExpense],
+        variable: [VariableExpense],
+        subscriptionsMonthlyMinor: Int64,
+        displayCurrency: CurrencyCode,
+        converter: CurrencyConverter,
+        reference: Date = .now,
+        calendar: Calendar = .current
+    ) -> CashFlowMetrics {
+        let incomeMinor = monthlyIncomeMinor(income, displayCurrency: displayCurrency, converter: converter)
+        let fixedMonthly = fixedMonthlyMinor(fixed, displayCurrency: displayCurrency, converter: converter)
+        let variableMonth = variableThisMonthMinor(
+            variable, displayCurrency: displayCurrency, converter: converter,
+            reference: reference, calendar: calendar)
+        let expenseMinor = fixedMonthly + variableMonth + subscriptionsMonthlyMinor
+        return CashFlowMetrics(incomeMinor: incomeMinor, expenseMinor: expenseMinor)
+    }
+
+    /// Σ convert(subscription.monthlyAmount → displayCurrency) over all subscriptions
+    /// (docs/13 §3/§7). Each subscription's monthly-equivalent `Money` is converted
+    /// per item before summing (HALF-UP; stored amounts untouched). Replaces the old
+    /// "filter to one currency" shortcut so mixed-currency portfolios sum correctly.
+    public static func subscriptionsMonthlyMinor(
+        _ subscriptions: [Subscription], displayCurrency: CurrencyCode, converter: CurrencyConverter
+    ) -> Int64 {
+        subscriptions.reduce(Int64(0)) { acc, sub in
+            guard let converted = try? converter.convert(sub.monthlyAmount, to: displayCurrency) else { return acc }
+            return acc + converted.minorUnits
+        }
     }
 }
 
@@ -184,6 +267,21 @@ public enum Analytics {
             }
             .sorted { $0.totalMinor != $1.totalMinor ? $0.totalMinor > $1.totalMinor : $0.category < $1.category }
     }
+
+    /// Aggregate `(category, Money)` rows into descending-by-total slices, converting
+    /// each row's `Money` to `displayCurrency` before aggregating (docs/13 §5.1/§7,
+    /// HALF-UP; stored amounts untouched). Unconvertible rows are skipped.
+    public static func categoryDistribution(
+        _ rows: [(category: String, amount: Money)],
+        displayCurrency: CurrencyCode,
+        converter: CurrencyConverter
+    ) -> [CategorySlice] {
+        let converted: [(category: String, amountMinor: Int64)] = rows.compactMap { row in
+            guard let m = try? converter.convert(row.amount, to: displayCurrency) else { return nil }
+            return (category: row.category, amountMinor: m.minorUnits)
+        }
+        return categoryDistribution(converted)
+    }
 }
 
 // MARK: - Lifetime cost (docs/13 §4 — price-history walk)
@@ -224,4 +322,28 @@ public struct MoneyFlow: Equatable, Sendable {
     public var totalExpensesMinor: Int64 { fixedMinor + variableMinor + subscriptionsMinor }
     /// Savings is clamped at 0 — an over-budget month shows no negative ribbon.
     public var savingsMinor: Int64 { max(0, incomeMinor - totalExpensesMinor) }
+
+    /// Build the bucketed money-flow with every income/fixed/variable bucket converted
+    /// to `displayCurrency` at read time before summing (docs/13 §6.5/§7; stored
+    /// amounts untouched). `subscriptionsMonthlyMinor` is expected already in the
+    /// display currency (use `CashFlow.subscriptionsMonthlyMinor(_:displayCurrency:converter:)`).
+    public static func make(
+        income: [IncomeSource],
+        fixed: [FixedExpense],
+        variable: [VariableExpense],
+        subscriptionsMonthlyMinor: Int64,
+        displayCurrency: CurrencyCode,
+        converter: CurrencyConverter,
+        reference: Date = .now,
+        calendar: Calendar = .current
+    ) -> MoneyFlow {
+        MoneyFlow(
+            incomeMinor: CashFlow.monthlyIncomeMinor(income, displayCurrency: displayCurrency, converter: converter),
+            fixedMinor: CashFlow.fixedMonthlyMinor(fixed, displayCurrency: displayCurrency, converter: converter),
+            variableMinor: CashFlow.variableThisMonthMinor(
+                variable, displayCurrency: displayCurrency, converter: converter,
+                reference: reference, calendar: calendar),
+            subscriptionsMinor: subscriptionsMonthlyMinor
+        )
+    }
 }

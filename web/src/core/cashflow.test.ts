@@ -4,7 +4,17 @@ import {
   monthlyIncomeMinor,
   monthlyExpensesMinor,
   cashFlowMetrics,
+  monthlyIncomeMinorIn,
+  fixedMonthlyMinorIn,
+  variableThisMonthMinorIn,
+  subscriptionsMonthlyMinorIn,
+  cashFlowMetricsIn,
+  type FixedExpenseItem,
+  type IncomeItem,
+  type SubscriptionItem,
+  type VariableExpenseItem,
 } from './cashflow';
+import { CurrencyConverter, type ExchangeRates } from './currency';
 
 // Mirrors the Swift CashFlowTests / AnalyticsTests vectors (docs/13 §6).
 
@@ -77,5 +87,101 @@ describe('cashFlowMetrics', () => {
     const m = cashFlowMetrics(100000, 130000);
     expect(m.netMinor).toBe(-30000);
     expect(m.savingsRate).toBeLessThan(0);
+  });
+});
+
+// MARK: Mixed-currency, converted to a display currency (docs/13 §6/§7)
+// Mirrors Swift CashFlowTests "Mixed-currency" cases with the SAME vectors.
+// Sample rates: eurUsd 1.10 (USD per EUR), btcEur 50_000, btcUsd 55_000.
+
+const SAMPLE_RATES: ExchangeRates = {
+  eurUsd: 1.1,
+  btcEur: 50_000,
+  btcUsd: 55_000,
+  fetchedAt: 0,
+};
+const sampleConverter = new CurrencyConverter(SAMPLE_RATES);
+
+describe('monthlyIncomeMinorIn (converter-aware)', () => {
+  it('converts each income per item before summing (€3000 + $1100→€1000 = €4000)', () => {
+    const income: IncomeItem[] = [
+      { amountMinor: 300_000, currency: 'EUR', frequency: 'monthly' },
+      { amountMinor: 110_000, currency: 'USD', frequency: 'monthly' },
+    ];
+    expect(monthlyIncomeMinorIn(income, 'EUR', sampleConverter)).toBe(400_000);
+    // Same inputs displayed in USD: €3000→$3300 + $1100 = $4400.
+    expect(monthlyIncomeMinorIn(income, 'USD', sampleConverter)).toBe(440_000);
+    // Stored amounts/currencies are untouched (display-only conversion).
+    expect(income[0]).toEqual({ amountMinor: 300_000, currency: 'EUR', frequency: 'monthly' });
+    expect(income[1]).toEqual({ amountMinor: 110_000, currency: 'USD', frequency: 'monthly' });
+  });
+
+  it('matches the plain overload when every item is already in the display currency', () => {
+    const income: IncomeItem[] = [
+      { amountMinor: 320_000, currency: 'EUR', frequency: 'monthly' },
+      { amountMinor: 60_000, currency: 'EUR', frequency: 'monthly' },
+    ];
+    expect(monthlyIncomeMinorIn(income, 'EUR', sampleConverter)).toBe(
+      monthlyIncomeMinor(income.map((i) => ({ amountMinor: i.amountMinor, frequency: i.frequency }))),
+    );
+  });
+
+  it('excludes one_time income and empty list -> 0', () => {
+    expect(
+      monthlyIncomeMinorIn(
+        [
+          { amountMinor: 300_000, currency: 'EUR', frequency: 'monthly' },
+          { amountMinor: 500_000, currency: 'USD', frequency: 'one_time' },
+        ],
+        'EUR',
+        sampleConverter,
+      ),
+    ).toBe(300_000);
+    expect(monthlyIncomeMinorIn([], 'EUR', sampleConverter)).toBe(0);
+  });
+});
+
+describe('fixedMonthlyMinorIn / variableThisMonthMinorIn (converter-aware)', () => {
+  it('converts fixed monthly-equivalents per item (€1100 + $220→€200 = €1300)', () => {
+    const fixed: FixedExpenseItem[] = [
+      { amountMinor: 110_000, currency: 'EUR', billingPeriod: 'monthly' },
+      { amountMinor: 22_000, currency: 'USD', billingPeriod: 'monthly' },
+    ];
+    expect(fixedMonthlyMinorIn(fixed, 'EUR', sampleConverter)).toBe(130_000);
+  });
+
+  it('converts this-month variable per item ($110 → €100)', () => {
+    const variable: VariableExpenseItem[] = [{ amountMinor: 11_000, currency: 'USD' }];
+    expect(variableThisMonthMinorIn(variable, 'EUR', sampleConverter)).toBe(10_000);
+  });
+});
+
+describe('subscriptionsMonthlyMinorIn (converter-aware)', () => {
+  it('converts each subscription per item (€12.99 + $11→€10 = €22.99)', () => {
+    const subs: SubscriptionItem[] = [
+      { monthlyMinor: 1_299, currency: 'EUR' },
+      { monthlyMinor: 1_100, currency: 'USD' },
+    ];
+    expect(subscriptionsMonthlyMinorIn(subs, 'EUR', sampleConverter)).toBe(2_299);
+  });
+});
+
+describe('cashFlowMetricsIn (converter-aware)', () => {
+  it('converts every income & expense before summing (income €4000, expenses €1450)', () => {
+    const income: IncomeItem[] = [
+      { amountMinor: 300_000, currency: 'EUR', frequency: 'monthly' },
+      { amountMinor: 110_000, currency: 'USD', frequency: 'monthly' },
+    ];
+    const fixed: FixedExpenseItem[] = [
+      { amountMinor: 110_000, currency: 'EUR', billingPeriod: 'monthly' },
+      { amountMinor: 22_000, currency: 'USD', billingPeriod: 'monthly' },
+    ];
+    const variable: VariableExpenseItem[] = [{ amountMinor: 11_000, currency: 'USD' }];
+    // Subscriptions already in display currency (e.g. €50).
+    const m = cashFlowMetricsIn(income, fixed, variable, 5_000, 'EUR', sampleConverter);
+    expect(m.incomeMinor).toBe(400_000); // €4000
+    // expenses = €1300 fixed + €100 variable + €50 subs = €1450.
+    expect(m.expenseMinor).toBe(145_000);
+    expect(m.netMinor).toBe(255_000);
   });
 });

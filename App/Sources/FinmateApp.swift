@@ -142,10 +142,19 @@ final class HomeStore {
     /// While true the dashboard is in reorder/hide edit mode.
     var isEditing: Bool = false
 
+    /// App-wide display currency (Settings default) + the rate-backed converter.
+    /// Every card amount is converted to this at read time (docs/13 §6/§7).
+    var displayCurrency: CurrencyCode
+    private let converter: CurrencyConverter
+
     private let repository: DashboardLayoutRepository
 
-    init(repository: DashboardLayoutRepository) {
+    init(repository: DashboardLayoutRepository,
+         displayCurrency: CurrencyCode = .eur,
+         converter: CurrencyConverter = CurrencyConverter(rates: AssetsSampleData.sampleRates)) {
         self.repository = repository
+        self.displayCurrency = displayCurrency
+        self.converter = converter
     }
 
     func load() async {
@@ -170,24 +179,26 @@ final class HomeStore {
     // MARK: Computed KPI values (from the sample data, via Domain math)
 
     private var subscriptionsMonthlyMinor: Int64 {
-        SampleData.subscriptions
-            .filter { $0.currency == .eur }
-            .reduce(Int64(0)) { $0 + $1.monthlyAmount.minorUnits }
+        CashFlow.subscriptionsMonthlyMinor(SampleData.subscriptions,
+                                           displayCurrency: displayCurrency, converter: converter)
     }
 
     private var metrics: CashFlowMetrics {
         CashFlow.metrics(income: CashFlowSampleData.income,
                          fixed: CashFlowSampleData.fixedExpenses,
                          variable: CashFlowSampleData.variableExpenses,
-                         subscriptionsMonthlyMinor: subscriptionsMonthlyMinor)
+                         subscriptionsMonthlyMinor: subscriptionsMonthlyMinor,
+                         displayCurrency: displayCurrency, converter: converter)
     }
 
     private var portfolioValueMinor: Int64 {
-        AssetsSampleData.assets.reduce(Int64(0)) { $0 + $1.valueMinor }
+        AssetValuation.portfolioValueMinor(AssetsSampleData.assets,
+                                           displayCurrency: displayCurrency, converter: converter)
     }
 
     private var portfolioGainMinor: Int64 {
-        AssetsSampleData.assets.reduce(Int64(0)) { $0 + AssetValuation.unrealizedGainMinor($1) }
+        AssetValuation.portfolioGainMinor(AssetsSampleData.assets,
+                                          displayCurrency: displayCurrency, converter: converter)
     }
 
     private var upcomingChargesCount: Int {
@@ -209,13 +220,13 @@ final class HomeStore {
         case .monthlySubscriptions:
             return DashboardCardValue(
                 title: id.title,
-                value: Money(minorUnits: subscriptionsMonthlyMinor, currency: .eur).formatted(),
+                value: Money(minorUnits: subscriptionsMonthlyMinor, currency: displayCurrency).formatted(),
                 detail: nil, valueTint: nil)
         case .netCashFlow:
             let net = metrics.netMinor
             return DashboardCardValue(
                 title: id.title,
-                value: Money(minorUnits: net, currency: .eur).formatted(),
+                value: Money(minorUnits: net, currency: displayCurrency).formatted(),
                 detail: net >= 0 ? "Surplus this month" : "Shortfall this month",
                 valueTint: net >= 0 ? .green : .red)
         case .savingsRate:
@@ -227,10 +238,10 @@ final class HomeStore {
                 valueTint: pct >= 0 ? nil : .red)
         case .portfolioValue:
             let gain = portfolioGainMinor
-            let gainStr = Money(minorUnits: gain, currency: .eur).formatted()
+            let gainStr = Money(minorUnits: gain, currency: displayCurrency).formatted()
             return DashboardCardValue(
                 title: id.title,
-                value: Money(minorUnits: portfolioValueMinor, currency: .eur).formatted(),
+                value: Money(minorUnits: portfolioValueMinor, currency: displayCurrency).formatted(),
                 detail: (gain >= 0 ? "+\(gainStr)" : gainStr) + " gain",
                 valueTint: nil)
         case .upcomingCharges:
@@ -261,6 +272,9 @@ enum DashboardSampleData {
 /// toggle enables drag-to-reorder (`.onMove`) and show/hide. Reduce-motion friendly.
 struct HomeView: View {
     @State private var store = HomeStore(repository: DashboardSampleData.repository)
+    @State private var didBind = false
+    @Environment(\.repositories) private var repositories
+    @Environment(PreferencesStore.self) private var preferences
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -286,7 +300,21 @@ struct HomeView: View {
             }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.isEditing)
             .animation(reduceMotion ? nil : .default, value: store.layout)
-            .task { await store.load() }
+            .task {
+                if !didBind {
+                    let rates = (try? await repositories.exchangeRates.latestRates()) ?? AssetsSampleData.sampleRates
+                    store = HomeStore(
+                        repository: DashboardSampleData.repository,
+                        displayCurrency: preferences.preferences.defaultCurrency,
+                        converter: CurrencyConverter(rates: rates))
+                    didBind = true
+                }
+                await store.load()
+            }
+            // App-wide display currency: recompute card values on Settings change.
+            .onChange(of: preferences.preferences.defaultCurrency) { _, newValue in
+                store.displayCurrency = newValue
+            }
         }
     }
 

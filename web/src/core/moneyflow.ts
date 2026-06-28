@@ -9,12 +9,44 @@
 // Savings. Income is the single left node; one ribbon Income→bucket per non-zero bucket.
 // total = max(income, Σbuckets) guards the over-budget case so nothing exceeds the canvas.
 
+import type { CurrencyCode, CurrencyConverter } from './currency';
+import {
+  type FixedExpenseItem,
+  type IncomeItem,
+  type VariableExpenseItem,
+  fixedMonthlyMinorIn,
+  monthlyIncomeMinorIn,
+  variableThisMonthMinorIn,
+} from './cashflow';
+
 /** A bucketed money flow (docs/13 §6.5). Savings is clamped ≥ 0 by the caller/getter. */
 export interface MoneyFlow {
   incomeMinor: number;
   fixedMinor: number;
   variableMinor: number;
   subscriptionsMinor: number;
+}
+
+/**
+ * Build the bucketed money-flow with every income/fixed/variable bucket converted to
+ * `displayCurrency` at read time before summing (docs/13 §6.5/§7; stored amounts
+ * untouched). `subscriptionsMonthlyMinor` is expected already in the display currency
+ * (compute via `subscriptionsMonthlyMinorIn`). Mirrors Swift `MoneyFlow.make`.
+ */
+export function makeMoneyFlow(
+  income: IncomeItem[],
+  fixed: FixedExpenseItem[],
+  variable: VariableExpenseItem[],
+  subscriptionsMonthlyMinor: number,
+  displayCurrency: CurrencyCode,
+  converter: CurrencyConverter,
+): MoneyFlow {
+  return {
+    incomeMinor: monthlyIncomeMinorIn(income, displayCurrency, converter),
+    fixedMinor: fixedMonthlyMinorIn(fixed, displayCurrency, converter),
+    variableMinor: variableThisMonthMinorIn(variable, displayCurrency, converter),
+    subscriptionsMinor: subscriptionsMonthlyMinor,
+  };
 }
 
 /** Σ of the three expense buckets. */

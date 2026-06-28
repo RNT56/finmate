@@ -12,14 +12,14 @@ import {
   btcFromSats,
 } from '../../core/currency';
 import { formatMoney, parseMoney } from '../../core/money';
-import { SAMPLE_ASSET_RATES } from '../assets/useAssets';
+import { APP_RATES } from '../../lib/rates';
 
 const FIAT: CurrencyCode[] = ['EUR', 'USD'];
 
 export function Calculator() {
   const [amount, setAmount] = useState('500');
   const [fiat, setFiat] = useState<CurrencyCode>('EUR');
-  const converter = useMemo(() => new CurrencyConverter(SAMPLE_ASSET_RATES), []);
+  const converter = useMemo(() => new CurrencyConverter(APP_RATES), []);
 
   const result = useMemo(() => {
     let minor: number;
@@ -37,8 +37,8 @@ export function Calculator() {
     };
   }, [amount, fiat, converter]);
 
-  const btcEur = SAMPLE_ASSET_RATES.btcEur;
-  const btcUsd = SAMPLE_ASSET_RATES.btcUsd;
+  const btcEur = APP_RATES.btcEur;
+  const btcUsd = APP_RATES.btcUsd;
 
   return (
     <Page title="BTC Calculator">
@@ -114,7 +114,7 @@ export function Calculator() {
             <RateRow label="BTC / USD" value={`$${btcUsd.toLocaleString('en-US')}`} />
             <RateRow
               label="EUR / USD"
-              value={SAMPLE_ASSET_RATES.eurUsd.toFixed(2)}
+              value={APP_RATES.eurUsd.toFixed(2)}
             />
           </ul>
           <div className="fm-secondary" style={{ fontSize: 12, marginTop: 8 }}>

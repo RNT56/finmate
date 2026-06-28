@@ -6,20 +6,8 @@ import type { Subscription, SubscriptionRepository } from './types';
 import { monthlyAmountMinor } from './types';
 import { InMemorySubscriptionRepository } from './repository';
 import { getRepositories } from '../../lib/repositories';
-import {
-  CurrencyConverter,
-  type CurrencyCode,
-  type ExchangeRates,
-} from '../../core/currency';
-
-// Fixed sample rate snapshot — in production this comes from the market-data
-// Edge Function via the ExchangeRateProvider repository (docs/13 §2).
-const SAMPLE_RATES: ExchangeRates = {
-  eurUsd: 1.0825,
-  btcEur: 58234.5,
-  btcUsd: 63038.85,
-  fetchedAt: Date.now(),
-};
+import { CurrencyConverter, type CurrencyCode } from '../../core/currency';
+import { APP_RATES } from '../../lib/rates';
 
 export interface UseSubscriptions {
   subscriptions: Subscription[];
@@ -75,7 +63,7 @@ export function useSubscriptions(
     [repository, load]
   );
 
-  const converter = useMemo(() => new CurrencyConverter(SAMPLE_RATES), []);
+  const converter = useMemo(() => new CurrencyConverter(APP_RATES), []);
 
   const monthlyTotalMinor = useCallback(
     (displayCurrency: CurrencyCode): number =>

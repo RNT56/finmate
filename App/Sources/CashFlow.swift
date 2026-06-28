@@ -89,21 +89,33 @@ final class CashFlowStore {
     private let incomeRepository: IncomeRepository
     private let expenseRepository: ExpenseRepository
     private let categoryRepository: CategoryRepository
-    /// Subscriptions feed the expense roll-up; their monthly-equivalent total in EUR
-    /// is computed once via the Domain math (matches the Home card).
-    private let subscriptionsMonthlyMinor: Int64
-    private let displayCurrency: CurrencyCode = .eur
+    /// Subscriptions feed the expense roll-up; kept raw so the monthly-equivalent
+    /// total recomputes (per-item converted) when the display currency changes.
+    private let subscriptions: [Subscription]
+    /// App-wide display currency (Settings default) + the rate-backed converter.
+    /// Every income/expense `Money` is converted to this at read time before summing
+    /// (display-only — stored amounts are never mutated, docs/13 §6/§7).
+    var displayCurrency: CurrencyCode
+    private let converter: CurrencyConverter
 
     init(incomeRepository: IncomeRepository,
          expenseRepository: ExpenseRepository,
          categoryRepository: CategoryRepository,
-         subscriptions: [Subscription]) {
+         subscriptions: [Subscription],
+         displayCurrency: CurrencyCode = .eur,
+         converter: CurrencyConverter = CurrencyConverter(rates: AssetsSampleData.sampleRates)) {
         self.incomeRepository = incomeRepository
         self.expenseRepository = expenseRepository
         self.categoryRepository = categoryRepository
-        self.subscriptionsMonthlyMinor = subscriptions
-            .filter { $0.currency == .eur }
-            .reduce(Int64(0)) { $0 + $1.monthlyAmount.minorUnits }
+        self.subscriptions = subscriptions
+        self.displayCurrency = displayCurrency
+        self.converter = converter
+    }
+
+    /// Subscriptions monthly-equivalent total, converted per item to the display
+    /// currency (matches the Home card + Subscriptions tab).
+    private var subscriptionsMonthlyMinor: Int64 {
+        CashFlow.subscriptionsMonthlyMinor(subscriptions, displayCurrency: displayCurrency, converter: converter)
     }
 
     func load() async {
@@ -180,10 +192,12 @@ final class CashFlowStore {
         await load()
     }
 
-    /// The signed cash-flow metrics for the current month (docs/13 §6).
+    /// The signed cash-flow metrics for the current month, every income/expense
+    /// converted to the display currency before summing (docs/13 §6/§7).
     var metrics: CashFlowMetrics {
         CashFlow.metrics(income: income, fixed: fixedExpenses, variable: variableExpenses,
-                         subscriptionsMonthlyMinor: subscriptionsMonthlyMinor)
+                         subscriptionsMonthlyMinor: subscriptionsMonthlyMinor,
+                         displayCurrency: displayCurrency, converter: converter)
     }
 
     var monthlyIncome: Money { Money(minorUnits: metrics.incomeMinor, currency: displayCurrency) }
@@ -191,34 +205,33 @@ final class CashFlowStore {
     var net: Money { Money(minorUnits: metrics.netMinor, currency: displayCurrency) }
 
     var variableThisMonthMinor: Int64 {
-        CashFlow.variableThisMonthMinor(variableExpenses)
+        CashFlow.variableThisMonthMinor(variableExpenses, displayCurrency: displayCurrency, converter: converter)
     }
 
     /// The bucketed money-flow for the headline Sankey (docs/13 §6.5, ADR-0016):
     /// Income → Fixed / Variable / Subscriptions / Savings (savings clamped ≥ 0).
+    /// Each bucket is converted to the display currency per item before summing.
     var moneyFlow: MoneyFlow {
-        let fixedMonthly = fixedExpenses.reduce(Int64(0)) { $0 + $1.monthlyMinor }
-        return MoneyFlow(
-            incomeMinor: metrics.incomeMinor,
-            fixedMinor: fixedMonthly,
-            variableMinor: variableThisMonthMinor,
-            subscriptionsMinor: subscriptionsMonthlyMinor
-        )
+        MoneyFlow.make(
+            income: income, fixed: fixedExpenses, variable: variableExpenses,
+            subscriptionsMonthlyMinor: subscriptionsMonthlyMinor,
+            displayCurrency: displayCurrency, converter: converter)
     }
 
     /// Expense category breakdown (fixed normalized monthly + this-month variable +
-    /// subscriptions bucket) via the Domain distribution aggregator (docs/13 §5.1).
+    /// subscriptions bucket) via the Domain distribution aggregator, each row
+    /// converted to the display currency first (docs/13 §5.1/§7).
     var expenseSlices: [CategorySlice] {
-        var rows: [(category: String, amountMinor: Int64)] = fixedExpenses.map {
-            (categoryName($0.categoryID), $0.monthlyMinor)
+        var rows: [(category: String, amount: Money)] = fixedExpenses.map {
+            (categoryName($0.categoryID), Money(minorUnits: $0.monthlyMinor, currency: $0.currency))
         }
         for ve in variableExpenses where Calendar.current.isDate(ve.date, equalTo: .now, toGranularity: .month) {
-            rows.append((categoryName(ve.categoryID), ve.amountMinor))
+            rows.append((categoryName(ve.categoryID), Money(minorUnits: ve.amountMinor, currency: ve.currency)))
         }
         if subscriptionsMonthlyMinor > 0 {
-            rows.append(("Subscriptions", subscriptionsMonthlyMinor))
+            rows.append(("Subscriptions", Money(minorUnits: subscriptionsMonthlyMinor, currency: displayCurrency)))
         }
-        return Analytics.categoryDistribution(rows)
+        return Analytics.categoryDistribution(rows, displayCurrency: displayCurrency, converter: converter)
     }
 }
 
@@ -226,6 +239,7 @@ final class CashFlowStore {
 
 struct CashFlowView: View {
     @Environment(\.repositories) private var repositories
+    @Environment(PreferencesStore.self) private var preferences
     @State private var store = CashFlowStore(
         incomeRepository: CashFlowSampleData.incomeRepository,
         expenseRepository: CashFlowSampleData.expenseRepository,
@@ -299,15 +313,23 @@ struct CashFlowView: View {
                     // Subscriptions feed the expense roll-up; fetch them from the
                     // injected repo so the bucket matches the Subscriptions tab.
                     let subs = (try? await repositories.subscriptions.all()) ?? SampleData.subscriptions
+                    let rates = (try? await repositories.exchangeRates.latestRates()) ?? AssetsSampleData.sampleRates
                     store = CashFlowStore(
                         incomeRepository: repositories.income,
                         expenseRepository: repositories.expenses,
                         categoryRepository: repositories.categories,
-                        subscriptions: subs
+                        subscriptions: subs,
+                        displayCurrency: preferences.preferences.defaultCurrency,
+                        converter: CurrencyConverter(rates: rates)
                     )
                     didBind = true
                 }
                 await store.load()
+            }
+            // App-wide display currency: recompute KPIs/flow/breakdown when the
+            // Settings default-currency picker changes.
+            .onChange(of: preferences.preferences.defaultCurrency) { _, newValue in
+                store.displayCurrency = newValue
             }
         }
     }
@@ -322,7 +344,7 @@ struct CashFlowView: View {
                     Spacer()
                     Text("This month").font(.caption).foregroundStyle(.secondary)
                 }
-                MoneyFlowView(flow: store.moneyFlow)
+                MoneyFlowView(flow: store.moneyFlow, displayCurrency: store.displayCurrency)
                 flowLegend
             }
         }
@@ -395,7 +417,7 @@ struct CashFlowView: View {
                         Circle().fill(color(for: index)).frame(width: 10, height: 10)
                         Text(slice.category).font(.subheadline)
                         Spacer()
-                        Text(Money(minorUnits: slice.totalMinor, currency: .eur).formatted())
+                        Text(Money(minorUnits: slice.totalMinor, currency: store.displayCurrency).formatted())
                             .font(.subheadline.monospacedDigit())
                         Text("\(Int((slice.share * 100).rounded()))%")
                             .font(.caption.monospacedDigit())

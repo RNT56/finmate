@@ -14,22 +14,10 @@ import {
   portfolioGainMinor,
   portfolioValueMinor,
 } from '../../core/assets';
-import {
-  CurrencyConverter,
-  type CurrencyCode,
-  type ExchangeRates,
-} from '../../core/currency';
+import { CurrencyConverter, type CurrencyCode } from '../../core/currency';
 import { type AssetsRepository } from './repository';
 import { getRepositories } from '../../lib/repositories';
-
-// Sample display rates (identical both clients so figures agree): in production these
-// come from the market-data Edge Function (ADR-0010), never a client-side provider.
-export const SAMPLE_ASSET_RATES: ExchangeRates = {
-  eurUsd: 1.1,
-  btcEur: 50_000,
-  btcUsd: 55_000,
-  fetchedAt: Date.now(),
-};
+import { APP_RATES } from '../../lib/rates';
 
 export interface UseAssets {
   loading: boolean;
@@ -129,7 +117,7 @@ export function useAssets(
   );
 
   const converter = useMemo(
-    () => new CurrencyConverter(SAMPLE_ASSET_RATES),
+    () => new CurrencyConverter(APP_RATES),
     []
   );
 

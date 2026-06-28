@@ -14,6 +14,9 @@ import { useCalendar } from '../features/calendar/useCalendar';
 import { useDashboardLayout } from '../features/home/useDashboardLayout';
 import { type DashboardCardId, cardTitles } from '../core/dashboard';
 import { formatMoney } from '../core/money';
+import { usePreferences } from '../features/settings/usePreferences';
+import { CurrencyConverter, type CurrencyCode } from '../core/currency';
+import { APP_RATES } from '../lib/rates';
 
 interface CardContent {
   label: string;
@@ -23,44 +26,53 @@ interface CardContent {
   tone?: 'up' | 'down';
 }
 
-function formatSignedMoney(minor: number, currency: 'EUR' | 'USD' | 'BTC', locale: string): string {
+function formatSignedMoney(minor: number, currency: CurrencyCode): string {
   const sign = minor > 0 ? '+' : '';
-  return `${sign}${formatMoney(minor, currency, locale)}`;
+  return `${sign}${formatMoney(minor, currency)}`;
 }
 
-/** Build the live content for every card from the feature hooks. */
+/** Build the live content for every card from the feature hooks. All money figures
+ *  render in the app-wide display currency (Settings), converted at read time. */
 function useCardContent(): { content: Record<DashboardCardId, CardContent>; loading: boolean } {
+  const { preferences } = usePreferences();
+  const currency = preferences.defaultCurrency;
+  const converter = useMemo(() => new CurrencyConverter(APP_RATES), []);
+
   const { subscriptions, monthlyTotalMinor, loading: subsLoading } = useSubscriptions();
   const { metrics, loading: cfLoading } = useCashFlow();
   const { totalValueMinor, totalGainMinor, totalGainPct, loading: assetsLoading } =
-    useAssets('EUR');
+    useAssets(currency);
   const { events, loading: calLoading } = useCalendar();
 
-  const subsTotal = monthlyTotalMinor('EUR');
+  const subsTotal = monthlyTotalMinor(currency);
 
   const upcomingCharges = useMemo(
     () => events.filter((e) => e.kind === 'subscription' || e.kind === 'fixedExpense'),
     [events],
   );
+  // Calendar events carry their own currency; convert each into the display currency
+  // (display-only, non-mutating — docs/13 §2/§7) before summing.
   const upcomingChargesMinor = useMemo(
-    () => upcomingCharges.reduce((sum, e) => sum + e.amountMinor, 0),
-    [upcomingCharges],
+    () =>
+      upcomingCharges.reduce((sum, e) => {
+        const c = converter.convert(e.amountMinor, e.currency, currency);
+        return sum + (c.ok ? c.minorUnits : e.currency === currency ? e.amountMinor : 0);
+      }, 0),
+    [upcomingCharges, converter, currency],
   );
+
+  const fmt = (minor: number) => formatMoney(minor, currency);
 
   const content: Record<DashboardCardId, CardContent> = {
     subscriptionsTotal: {
       label: cardTitles.subscriptionsTotal,
-      value: formatMoney(subsTotal, 'EUR', 'de-DE'),
-      detail: `${formatMoney(subsTotal * 12, 'EUR', 'de-DE')} / year`,
+      value: fmt(subsTotal),
+      detail: `${fmt(subsTotal * 12)} / year`,
     },
     netCashFlow: {
       label: cardTitles.netCashFlow,
-      value: formatSignedMoney(metrics.netMinor, 'EUR', 'de-DE'),
-      detail: `${formatMoney(metrics.incomeMinor, 'EUR', 'de-DE')} in · ${formatMoney(
-        metrics.expenseMinor,
-        'EUR',
-        'de-DE',
-      )} out`,
+      value: formatSignedMoney(metrics.netMinor, currency),
+      detail: `${fmt(metrics.incomeMinor)} in · ${fmt(metrics.expenseMinor)} out`,
       tone: metrics.netMinor >= 0 ? 'up' : 'down',
     },
     savingsRate: {
@@ -71,13 +83,13 @@ function useCardContent(): { content: Record<DashboardCardId, CardContent>; load
     },
     portfolioValue: {
       label: cardTitles.portfolioValue,
-      value: formatMoney(totalValueMinor, 'EUR', 'de-DE'),
-      detail: `${formatSignedMoney(totalGainMinor, 'EUR', 'de-DE')} (${(totalGainPct * 100).toFixed(1)}%)`,
+      value: fmt(totalValueMinor),
+      detail: `${formatSignedMoney(totalGainMinor, currency)} (${(totalGainPct * 100).toFixed(1)}%)`,
       tone: totalGainMinor >= 0 ? 'up' : 'down',
     },
     upcomingCharges: {
       label: cardTitles.upcomingCharges,
-      value: formatMoney(upcomingChargesMinor, 'EUR', 'de-DE'),
+      value: fmt(upcomingChargesMinor),
       detail: `${upcomingCharges.length} charge${upcomingCharges.length === 1 ? '' : 's'} this month`,
     },
     activeServices: {
