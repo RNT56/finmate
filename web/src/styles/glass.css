@@ -543,3 +543,37 @@ body {
     transition: none;
   }
 }
+
+/* ---- Auth / onboarding ---- */
+.fm-auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.fm-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  color: var(--fm-label-secondary);
+  font-size: 0.8125rem;
+}
+
+.fm-auth-divider::before,
+.fm-auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--fm-hairline);
+}
+
+.fm-auth-error {
+  background: color-mix(in srgb, var(--fm-down) 14%, transparent);
+  color: var(--fm-down);
+  border-radius: 10px;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+}

@@ -20,6 +20,9 @@ public struct RepositoryEnvironment: Sendable {
     public let preferences: any PreferencesRepository
     public let categories: any CategoryRepository
     public let exchangeRates: any ExchangeRateProvider
+    /// The chosen authentication repository: Supabase-backed when configured,
+    /// else the offline `DemoAuthRepository` ("Try the demo"). docs/07 §3.
+    public let auth: any AuthRepository
 
     public init(
         subscriptions: any SubscriptionRepository,
@@ -28,7 +31,8 @@ public struct RepositoryEnvironment: Sendable {
         assets: any AssetRepository,
         preferences: any PreferencesRepository,
         categories: any CategoryRepository,
-        exchangeRates: any ExchangeRateProvider
+        exchangeRates: any ExchangeRateProvider,
+        auth: any AuthRepository = DemoAuthRepository()
     ) {
         self.subscriptions = subscriptions
         self.income = income
@@ -37,7 +41,12 @@ public struct RepositoryEnvironment: Sendable {
         self.preferences = preferences
         self.categories = categories
         self.exchangeRates = exchangeRates
+        self.auth = auth
     }
+
+    /// True when the offline demo auth path is active (no Supabase config) — the
+    /// Auth screen surfaces the prominent "Try the demo" entry in this case.
+    public var isDemo: Bool { auth is DemoAuthRepository }
 
     /// Build the Supabase-backed environment for a resolved config. The single
     /// `SupabaseClientProvider` (Keychain-backed auth storage) is shared by every
@@ -51,7 +60,8 @@ public struct RepositoryEnvironment: Sendable {
             assets: SupabaseAssetRepository(provider: provider),
             preferences: SupabasePreferencesRepository(provider: provider),
             categories: SupabaseCategoryRepository(provider: provider),
-            exchangeRates: MarketDataRateProvider(provider: provider)
+            exchangeRates: MarketDataRateProvider(provider: provider),
+            auth: SupabaseAuthRepository(provider: provider)
         )
     }
 

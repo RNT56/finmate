@@ -21,6 +21,7 @@ import {
   type ExportSources,
 } from '../../core/dataExport';
 import { getRepositories } from '../../lib/repositories';
+import { useAuth } from '../auth/useAuth';
 
 const APPEARANCES: { value: Appearance; label: string }[] = [
   { value: 'system', label: 'System' },
@@ -32,6 +33,7 @@ const CURRENCIES: CurrencyCode[] = ['EUR', 'USD', 'BTC'];
 
 export function Settings() {
   const { preferences, update } = usePreferences();
+  const { user, signOut } = useAuth();
 
   // Wire Export Data (docs/07 §9.3): read every owned entity from the SELECTED
   // repositories (Supabase when configured, in-memory sample otherwise — the same
@@ -172,6 +174,30 @@ export function Settings() {
               }
             >
               Delete account
+            </button>
+          </SettingRow>
+        </Section>
+
+        {/* ---- Account ---- */}
+        <Section title="Account">
+          <SettingRow
+            label="Signed in"
+            hint={
+              user?.isDemo
+                ? 'You are exploring the offline demo (sample data).'
+                : (user?.email ?? 'Not signed in')
+            }
+          >
+            <button
+              type="button"
+              className="fm-btn fm-btn-ghost"
+              style={{ padding: '0.5rem 0.875rem', fontSize: '0.8125rem' }}
+              aria-label="Log out"
+              onClick={() => {
+                void signOut();
+              }}
+            >
+              Log out
             </button>
           </SettingRow>
         </Section>
