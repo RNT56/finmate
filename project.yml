@@ -66,18 +66,30 @@ targets:
         # Host the tests inside the app so `@testable import Finmate` resolves.
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Finmate.app/Finmate"
         BUNDLE_LOADER: "$(TEST_HOST)"
+  # Critical-flow smoke suite — drives the real UI through the offline "Try the
+  # demo" path (no network): launch → onboarding → root TabView, tab navigation,
+  # and add-subscription. Black-box XCUITest against the Finmate app under test.
+  FinmateUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: App/UITests
+    dependencies:
+      - target: Finmate
 schemes:
   Finmate:
     build:
       targets:
         Finmate: all
         FinmateAppTests: [test]
+        FinmateUITests: [test]
     test:
       gatherCoverageData: true
       coverageTargets:
         - Finmate
       targets:
         - FinmateAppTests
+        - FinmateUITests
     run:
       config: Debug
     profile:

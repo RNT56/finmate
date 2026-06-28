@@ -156,6 +156,7 @@ struct SubscriptionsListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingAdd = true } label: { Image(systemName: "plus") }
                         .accessibilityLabel("Add subscription")
+                        .accessibilityIdentifier("subscriptions.add")
                 }
             }
             .sheet(isPresented: $showingAdd) {
@@ -254,6 +255,7 @@ struct AddSubscriptionView: View {
             Form {
                 Section("Service") {
                     TextField("Name (e.g. Netflix, ChatGPT)", text: $name)
+                        .accessibilityIdentifier("addSubscription.name")
                         .onChange(of: name) { _, newValue in
                             inferredCategory = SubscriptionPredictor.predict(name: newValue)?.category ?? "Other"
                         }
@@ -262,6 +264,7 @@ struct AddSubscriptionView: View {
                 Section("Cost") {
                     TextField("Monthly amount in EUR", text: $amount)
                         .keyboardType(.decimalPad)
+                        .accessibilityIdentifier("addSubscription.amount")
                     if let amountError {
                         Text(amountError).font(.caption).foregroundStyle(.red)
                     }
@@ -272,7 +275,9 @@ struct AddSubscriptionView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save).disabled(name.isEmpty)
+                    Button("Save", action: save)
+                        .disabled(name.isEmpty)
+                        .accessibilityIdentifier("addSubscription.save")
                 }
             }
         }
