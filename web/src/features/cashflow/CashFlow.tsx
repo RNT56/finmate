@@ -29,6 +29,8 @@ export function CashFlow() {
     variableMinor,
     subscriptionsMinor,
     breakdown,
+    expenseCategories,
+    categoryName,
     displayCurrency,
     addIncome,
     removeIncome,
@@ -169,7 +171,7 @@ export function CashFlow() {
           rows={fixedExpenses.map((e) => ({
             id: e.id,
             primary: e.name,
-            secondary: `${e.categoryName} · ${e.billingPeriod} · ${fmt(fixedMonthlyAmountMinor(e))}/mo`,
+            secondary: `${categoryName(e.categoryId)} · ${e.billingPeriod} · ${fmt(fixedMonthlyAmountMinor(e))}/mo`,
             amount: fmt(e.amountMinor),
             entity: e,
           }))}
@@ -185,7 +187,7 @@ export function CashFlow() {
           rows={variableExpenses.map((e) => ({
             id: e.id,
             primary: e.name,
-            secondary: `${e.categoryName} · ${e.spentOn}`,
+            secondary: `${categoryName(e.categoryId)} · ${e.spentOn}`,
             amount: fmt(e.amountMinor),
             entity: e,
           }))}
@@ -199,6 +201,7 @@ export function CashFlow() {
         <EntityModal
           kind={modal.kind}
           existing={modal.existing}
+          categories={expenseCategories}
           onClose={() => setModal(null)}
           onSave={saveEntity}
         />

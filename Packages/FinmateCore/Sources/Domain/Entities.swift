@@ -103,22 +103,25 @@ public struct IncomeSource: Identifiable, Equatable, Sendable, Codable {
 
 /// A fixed/recurring bill — docs/05 `fixed_expenses`. Reuses `BillingPeriod`
 /// (monthly/quarterly/yearly; weekly also supported) for frequency normalization.
+/// `categoryID` is the normalized FK to `categories(id)` (docs/05 §3.5,
+/// `ON DELETE SET NULL`); the display name is resolved client-side from the
+/// categories list (ADR-0022), mirroring `Subscription.categoryID`.
 public struct FixedExpense: Identifiable, Equatable, Sendable, Codable {
     public let id: UUID
     public var name: String
     public var amountMinor: Int64
     public var currency: CurrencyCode
-    public var category: String?
+    public var categoryID: UUID?
     public var frequency: BillingPeriod
     public var dueDate: Date?
     public var autopay: Bool
     public var notes: String?
 
     public init(id: UUID = UUID(), name: String, amountMinor: Int64, currency: CurrencyCode,
-                category: String? = nil, frequency: BillingPeriod, dueDate: Date? = nil,
+                categoryID: UUID? = nil, frequency: BillingPeriod, dueDate: Date? = nil,
                 autopay: Bool = false, notes: String? = nil) {
         self.id = id; self.name = name; self.amountMinor = amountMinor; self.currency = currency
-        self.category = category; self.frequency = frequency; self.dueDate = dueDate
+        self.categoryID = categoryID; self.frequency = frequency; self.dueDate = dueDate
         self.autopay = autopay; self.notes = notes
     }
 
@@ -129,19 +132,22 @@ public struct FixedExpense: Identifiable, Equatable, Sendable, Codable {
 }
 
 /// A one-off spend within a month — docs/05 `variable_expenses`.
+/// `categoryID` is the normalized FK to `categories(id)` (docs/05 §3.6,
+/// `ON DELETE SET NULL`); the display name is resolved client-side from the
+/// categories list (ADR-0022), mirroring `Subscription.categoryID`.
 public struct VariableExpense: Identifiable, Equatable, Sendable, Codable {
     public let id: UUID
     public var name: String
     public var amountMinor: Int64
     public var currency: CurrencyCode
-    public var category: String?
+    public var categoryID: UUID?
     public var date: Date
     public var notes: String?
 
     public init(id: UUID = UUID(), name: String, amountMinor: Int64, currency: CurrencyCode,
-                category: String? = nil, date: Date, notes: String? = nil) {
+                categoryID: UUID? = nil, date: Date, notes: String? = nil) {
         self.id = id; self.name = name; self.amountMinor = amountMinor; self.currency = currency
-        self.category = category; self.date = date; self.notes = notes
+        self.categoryID = categoryID; self.date = date; self.notes = notes
     }
 }
 

@@ -16,7 +16,7 @@ import {
   type EntityKind,
 } from './entityForm';
 import { majorValue } from '../../core/money';
-import type { FixedExpense, IncomeSource, VariableExpense } from './types';
+import type { ExpenseCategory, FixedExpense, IncomeSource, VariableExpense } from './types';
 
 type Entity = IncomeSource | FixedExpense | VariableExpense;
 
@@ -24,6 +24,8 @@ interface Props {
   kind: EntityKind;
   /** Existing entity for edit; null for add. */
   existing: Entity | null;
+  /** Expense categories for the category select (resolves `categoryId → name`). */
+  categories: ExpenseCategory[];
   onSave: (entity: Entity) => void | Promise<void>;
   onClose: () => void;
 }
@@ -63,7 +65,7 @@ function initialDraft(kind: EntityKind, existing: Entity | null): EntityFormDraf
       amount: '',
       currency: 'EUR',
       cadence: kind === 'income' ? 'monthly' : 'monthly',
-      categoryName: '',
+      categoryId: '',
       date: '',
     };
   }
@@ -74,7 +76,7 @@ function initialDraft(kind: EntityKind, existing: Entity | null): EntityFormDraf
       amount: amountString(inc.amountMinor, inc.currency),
       currency: inc.currency,
       cadence: inc.frequency,
-      categoryName: '',
+      categoryId: '',
       date: inc.nextPayment ?? '',
     };
   }
@@ -85,7 +87,7 @@ function initialDraft(kind: EntityKind, existing: Entity | null): EntityFormDraf
       amount: amountString(fx.amountMinor, fx.currency),
       currency: fx.currency,
       cadence: fx.billingPeriod,
-      categoryName: fx.categoryName,
+      categoryId: fx.categoryId ?? '',
       date: fx.dueDate ?? '',
     };
   }
@@ -95,12 +97,12 @@ function initialDraft(kind: EntityKind, existing: Entity | null): EntityFormDraf
     amount: amountString(va.amountMinor, va.currency),
     currency: va.currency,
     cadence: 'monthly',
-    categoryName: va.categoryName,
+    categoryId: va.categoryId ?? '',
     date: va.spentOn,
   };
 }
 
-export function EntityModal({ kind, existing, onSave, onClose }: Props) {
+export function EntityModal({ kind, existing, categories, onSave, onClose }: Props) {
   const [draft, setDraft] = useState<EntityFormDraft>(() => initialDraft(kind, existing));
   const [error, setError] = useState<string | null>(null);
 
@@ -217,13 +219,19 @@ export function EntityModal({ kind, existing, onSave, onClose }: Props) {
                 <label className="fm-field-label" htmlFor="ent-category">
                   Category
                 </label>
-                <input
+                <select
                   id="ent-category"
-                  className="fm-input"
-                  placeholder="e.g. Housing, Groceries"
-                  value={draft.categoryName}
-                  onChange={(e) => set('categoryName', e.target.value)}
-                />
+                  className="fm-select"
+                  value={draft.categoryId}
+                  onChange={(e) => set('categoryId', e.target.value)}
+                >
+                  <option value="">Uncategorized</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 

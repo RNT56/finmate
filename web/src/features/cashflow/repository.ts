@@ -7,10 +7,29 @@
 
 import type {
   CashFlowRepository,
+  ExpenseCategory,
   FixedExpense,
   IncomeSource,
   VariableExpense,
 } from './types';
+
+// Stable expense categories (ADR-0022) — the normalized `categories` rows the sample
+// fixed/variable expenses reference by id. The SAME UUIDs the iOS sample uses
+// (App/Sources/Subscriptions.swift `SampleData.expenseCategories`) so both clients
+// resolve `categoryId → name` identically offline.
+const CATEGORY_HOUSING = '00000000-0000-0000-0000-0000000000C1';
+const CATEGORY_GROCERIES = '00000000-0000-0000-0000-0000000000C2';
+const CATEGORY_TRANSPORT = '00000000-0000-0000-0000-0000000000C3';
+const CATEGORY_UTILITIES = '00000000-0000-0000-0000-0000000000C4';
+const CATEGORY_ENTERTAINMENT = '00000000-0000-0000-0000-0000000000C5';
+
+export const sampleExpenseCategories: ExpenseCategory[] = [
+  { id: CATEGORY_HOUSING, name: 'Housing', slug: 'housing' },
+  { id: CATEGORY_GROCERIES, name: 'Groceries', slug: 'groceries' },
+  { id: CATEGORY_TRANSPORT, name: 'Transport', slug: 'transport' },
+  { id: CATEGORY_UTILITIES, name: 'Utilities', slug: 'utilities' },
+  { id: CATEGORY_ENTERTAINMENT, name: 'Entertainment', slug: 'entertainment' },
+];
 
 export const sampleIncomes: IncomeSource[] = [
   {
@@ -38,7 +57,7 @@ export const sampleFixedExpenses: FixedExpense[] = [
     amountMinor: 110000, // €1,100.00 / month
     currency: 'EUR',
     billingPeriod: 'monthly',
-    categoryName: 'Housing',
+    categoryId: CATEGORY_HOUSING,
     dueDate: '2026-01-01', // rent due on the 1st
   },
   {
@@ -47,7 +66,7 @@ export const sampleFixedExpenses: FixedExpense[] = [
     amountMinor: 9000, // €90.00 / month
     currency: 'EUR',
     billingPeriod: 'monthly',
-    categoryName: 'Insurance',
+    categoryId: CATEGORY_UTILITIES,
     dueDate: '2026-01-18', // insurance debit on the 18th
   },
 ];
@@ -58,7 +77,7 @@ export const sampleVariableExpenses: VariableExpense[] = [
     name: 'Groceries',
     amountMinor: 40000, // €400.00 this month
     currency: 'EUR',
-    categoryName: 'Groceries',
+    categoryId: CATEGORY_GROCERIES,
     spentOn: '2026-06-15',
   },
 ];
@@ -88,6 +107,10 @@ export class InMemoryCashFlowRepository implements CashFlowRepository {
 
   async variableExpenses(): Promise<VariableExpense[]> {
     return [...this.variableStore.values()].map((e) => ({ ...e }));
+  }
+
+  async expenseCategories(): Promise<ExpenseCategory[]> {
+    return sampleExpenseCategories.map((c) => ({ ...c }));
   }
 
   async upsertIncome(income: IncomeSource): Promise<void> {

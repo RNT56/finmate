@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
+  CategoryRow,
   Database,
   FixedExpenseRow,
   IncomeSourceRow,
@@ -13,6 +14,7 @@ import type {
 } from '../../types/database';
 import type {
   CashFlowRepository,
+  ExpenseCategory,
   FixedExpense,
   IncomeSource,
   VariableExpense,
@@ -29,33 +31,31 @@ export function incomeFromRow(row: IncomeSourceRow): IncomeSource {
   };
 }
 
-export function fixedExpenseFromRow(
-  row: FixedExpenseRow,
-  categoryName = '',
-): FixedExpense {
+export function fixedExpenseFromRow(row: FixedExpenseRow): FixedExpense {
   return {
     id: row.id,
     name: row.name,
     amountMinor: row.amount_minor,
     currency: row.currency,
     billingPeriod: row.billing_period,
-    categoryName,
+    categoryId: row.category_id,
     dueDate: row.due_date,
   };
 }
 
-export function variableExpenseFromRow(
-  row: VariableExpenseRow,
-  categoryName = '',
-): VariableExpense {
+export function variableExpenseFromRow(row: VariableExpenseRow): VariableExpense {
   return {
     id: row.id,
     name: row.name,
     amountMinor: row.amount_minor,
     currency: row.currency,
-    categoryName,
+    categoryId: row.category_id,
     spentOn: row.spent_on,
   };
+}
+
+export function expenseCategoryFromRow(row: CategoryRow): ExpenseCategory {
+  return { id: row.id, name: row.name, slug: row.slug };
 }
 
 /** Domain -> Insert/Update payload. Omits `user_id` (RLS owner default) and the
@@ -71,8 +71,7 @@ export function incomeToRow(income: IncomeSource): Partial<IncomeSourceRow> {
   };
 }
 
-/** Domain -> Insert/Update payload. `categoryName` is a join-derived label, not a
- *  column, so it is not persisted here (matches the read mapper's '' default). */
+/** Domain -> Insert/Update payload. `categoryId` is the normalized FK column. */
 export function fixedExpenseToRow(expense: FixedExpense): Partial<FixedExpenseRow> {
   return {
     id: expense.id,
@@ -80,6 +79,7 @@ export function fixedExpenseToRow(expense: FixedExpense): Partial<FixedExpenseRo
     amount_minor: expense.amountMinor,
     currency: expense.currency,
     billing_period: expense.billingPeriod,
+    category_id: expense.categoryId,
     due_date: expense.dueDate,
   };
 }
@@ -91,6 +91,7 @@ export function variableExpenseToRow(expense: VariableExpense): Partial<Variable
     name: expense.name,
     amount_minor: expense.amountMinor,
     currency: expense.currency,
+    category_id: expense.categoryId,
     spent_on: expense.spentOn,
   };
 }
@@ -113,7 +114,7 @@ export class SupabaseCashFlowRepository implements CashFlowRepository {
       .select('*')
       .order('name', { ascending: true });
     if (error) throw error;
-    return (data ?? []).map((row) => fixedExpenseFromRow(row));
+    return (data ?? []).map(fixedExpenseFromRow);
   }
 
   async variableExpenses(): Promise<VariableExpense[]> {
@@ -122,7 +123,17 @@ export class SupabaseCashFlowRepository implements CashFlowRepository {
       .select('*')
       .order('spent_on', { ascending: false });
     if (error) throw error;
-    return (data ?? []).map((row) => variableExpenseFromRow(row));
+    return (data ?? []).map(variableExpenseFromRow);
+  }
+
+  async expenseCategories(): Promise<ExpenseCategory[]> {
+    const { data, error } = await this.client
+      .from('categories')
+      .select('*')
+      .eq('kind', 'expense')
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(expenseCategoryFromRow);
   }
 
   async upsertIncome(income: IncomeSource): Promise<void> {

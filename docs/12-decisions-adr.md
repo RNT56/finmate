@@ -39,6 +39,7 @@ This document is the authoritative source for "why is it built this way?" It res
 | [ADR-0019](#adr-0019--swift-6-strict-concurrency-from-day-one) | Swift 6 strict concurrency from day one | Accepted | — |
 | [ADR-0020](#adr-0020--single-canonical-domain-field-names-kill-substimate-duality) | Single canonical domain field names (kill Substimate duality) | Accepted | — |
 | [ADR-0021](#adr-0021--web-client-brought-into-scope-amends-adr-0002) | Web client brought into scope (amends ADR-0002) | Accepted | — |
+| [ADR-0022](#adr-0022--expenses-use-the-normalized-category_id-fk-names-resolved-client-side) | Expenses use the normalized `category_id` FK (names resolved client-side) | Accepted | — |
 
 ---
 
@@ -745,6 +746,39 @@ Bring a **web client into committed scope** as a **separate Vite + React 19 + Ty
 
 ---
 
+## ADR-0022 — Expenses use the normalized `category_id` FK (names resolved client-side)
+
+- **Status:** Accepted
+- **Date:** 2026-06-28
+- **Owner:** Product owner (`ridfox44@gmail.com`)
+- **Relates to:** [ADR-0020](#adr-0020--single-canonical-domain-field-names-kill-substimate-duality), [docs/05 §3.5–3.6](./05-data-model.md)
+
+### Context
+
+The schema ([docs/05 §3.5–3.6](./05-data-model.md)) models the expense→category relationship as a **normalized foreign key**: `fixed_expenses.category_id` and `variable_expenses.category_id` both reference `categories(id)` with `ON DELETE SET NULL`. `Subscription` already follows this — its domain type carries `categoryID: UUID?` and its DTO maps `category_id`. The two expense entities had **diverged** from both the schema and `Subscription`:
+
+- iOS modeled the category as **free text** — `FixedExpense.category: String?` / `VariableExpense.category: String?` — never persisted to the FK column, with the DTOs hard-coding `category: nil` on read.
+- web carried a **denormalized** `categoryName: string` rather than an id.
+
+This is exactly the field-name/representation duality ADR-0020 exists to kill: two spellings of "what category is this," neither matching the normalized column the database actually stores. Free text also cannot rename, recolor, or protect a category, and it silently fragments analytics ("Food" vs "food" vs "Groceries").
+
+### Decision
+
+Expenses use the **normalized `category_id` FK** as the single source of truth, matching the schema and matching `Subscription`:
+
+- **Domain:** `FixedExpense.categoryID: UUID?` and `VariableExpense.categoryID: UUID?` (mirroring `Subscription.categoryID`). The free-text `category` field is removed.
+- **DataLayer:** `FixedExpenseDTO`/`VariableExpenseDTO` map `category_id ↔ categoryID`, following the `SubscriptionDTO` coding-key pattern.
+- **Names are resolved client-side** from the categories list (the `Category` entity + `CategoryRepository` already exist) for display only — breakdown rows, expense-row secondary labels, and the add/edit **category Picker** (which now selects a `Category` by id, not free text). Unknown/`nil` ids resolve to **"Uncategorized"**.
+- The pure analytics math is **unaffected**: `Analytics.categoryDistribution(_:)` is label-agnostic (it groups by a supplied string), so the store resolves `categoryID → name` *before* building the rows; KPIs and the money-flow Sankey are amount-based and untouched.
+
+### Consequences
+
+- **Positive:** One representation of "category" across `Subscription`, `FixedExpense`, `VariableExpense`, the schema, and both clients. Categories can be renamed/recolored/protected centrally without rewriting expense rows; analytics no longer fragments on free-text spelling; `ON DELETE SET NULL` is honored end-to-end.
+- **Negative:** Display now requires a categories lookup (a small, cached read) rather than reading a string off the row. The **web client must drop the denormalized `categoryName`** as its source of truth and resolve names from the categories list like iOS (follow-on web task).
+- **Follow-on:** web `features/cashflow` types/`useCashFlow` switch from `categoryName` to `categoryId` with client-side name resolution; seed categories gain stable ids so both clients agree offline.
+
+---
+
 ## Decision dependency map
 
 ```mermaid
@@ -770,6 +804,8 @@ flowchart TD
     A1 --> A19["ADR-0019 Swift 6 strict concurrency"]
     A5 --> A20["ADR-0020 Canonical field names"]
     A3 --> A20
+    A20 --> A22["ADR-0022 Expenses use category_id FK"]
+    A3 --> A22
     A6 --> A14["ADR-0014 Supabase Realtime over delta-polling"]
     A2 --> A13["ADR-0013 Local notifications in v1"]
     A5 --> A15["ADR-0015 Average-cost basis"]

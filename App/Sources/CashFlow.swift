@@ -54,12 +54,16 @@ enum CashFlowSampleData {
         IncomeSource(name: "Salary", amountMinor: 320_000, currency: .eur, frequency: .monthly, nextPayment: dayOfThisMonth(15)),
         IncomeSource(name: "Freelance", amountMinor: 60_000, currency: .eur, frequency: .monthly, nextPayment: dayOfThisMonth(25)),
     ]
+    // Reference the stable `SampleData.expenseCategories` rows by id (ADR-0022).
+    private static func categoryID(_ slug: String) -> UUID? {
+        SampleData.expenseCategories.first { $0.slug == slug }?.id
+    }
     static let fixedExpenses: [FixedExpense] = [
-        FixedExpense(name: "Rent", amountMinor: 110_000, currency: .eur, category: "Housing", frequency: .monthly, dueDate: dayOfThisMonth(1), autopay: true),
-        FixedExpense(name: "Insurance", amountMinor: 9_000, currency: .eur, category: "Insurance", frequency: .monthly, dueDate: dayOfThisMonth(5), autopay: true),
+        FixedExpense(name: "Rent", amountMinor: 110_000, currency: .eur, categoryID: categoryID("housing"), frequency: .monthly, dueDate: dayOfThisMonth(1), autopay: true),
+        FixedExpense(name: "Insurance", amountMinor: 9_000, currency: .eur, categoryID: categoryID("utilities"), frequency: .monthly, dueDate: dayOfThisMonth(5), autopay: true),
     ]
     static let variableExpenses: [VariableExpense] = [
-        VariableExpense(name: "Groceries", amountMinor: 40_000, currency: .eur, category: "Food", date: .now),
+        VariableExpense(name: "Groceries", amountMinor: 40_000, currency: .eur, categoryID: categoryID("groceries"), date: .now),
     ]
     static let incomeRepository = InMemoryIncomeRepository(seed: income)
     static let expenseRepository = InMemoryExpenseRepository(fixedSeed: fixedExpenses, variableSeed: variableExpenses)
@@ -73,9 +77,13 @@ final class CashFlowStore {
     private(set) var income: [IncomeSource] = []
     private(set) var fixedExpenses: [FixedExpense] = []
     private(set) var variableExpenses: [VariableExpense] = []
+    /// The expense categories (ADR-0022) used to resolve `categoryID → name` for
+    /// the breakdown rows, the expense-row secondary labels, and the form Picker.
+    private(set) var expenseCategories: [Domain.Category] = []
 
     private let incomeRepository: IncomeRepository
     private let expenseRepository: ExpenseRepository
+    private let categoryRepository: CategoryRepository
     /// Subscriptions feed the expense roll-up; their monthly-equivalent total in EUR
     /// is computed once via the Domain math (matches the Home card).
     private let subscriptionsMonthlyMinor: Int64
@@ -83,9 +91,11 @@ final class CashFlowStore {
 
     init(incomeRepository: IncomeRepository,
          expenseRepository: ExpenseRepository,
+         categoryRepository: CategoryRepository,
          subscriptions: [Subscription]) {
         self.incomeRepository = incomeRepository
         self.expenseRepository = expenseRepository
+        self.categoryRepository = categoryRepository
         self.subscriptionsMonthlyMinor = subscriptions
             .filter { $0.currency == .eur }
             .reduce(Int64(0)) { $0 + $1.monthlyAmount.minorUnits }
@@ -95,6 +105,16 @@ final class CashFlowStore {
         income = (try? await incomeRepository.all()) ?? []
         fixedExpenses = (try? await expenseRepository.fixed()) ?? []
         variableExpenses = (try? await expenseRepository.variable()) ?? []
+        expenseCategories = (try? await categoryRepository.categories(kind: .expense)) ?? []
+    }
+
+    /// Resolve a category id to its display name, falling back to "Uncategorized"
+    /// (ADR-0022). The pure breakdown math stays label-agnostic.
+    func categoryName(_ id: UUID?) -> String {
+        guard let id, let match = expenseCategories.first(where: { $0.id == id }) else {
+            return "Uncategorized"
+        }
+        return match.name
     }
 
     // MARK: Income mutations — call the repo, then reload (KPIs + flow recompute).
@@ -172,10 +192,10 @@ final class CashFlowStore {
     /// subscriptions bucket) via the Domain distribution aggregator (docs/13 §5.1).
     var expenseSlices: [CategorySlice] {
         var rows: [(category: String, amountMinor: Int64)] = fixedExpenses.map {
-            ($0.category ?? "Other", $0.monthlyMinor)
+            (categoryName($0.categoryID), $0.monthlyMinor)
         }
         for ve in variableExpenses where Calendar.current.isDate(ve.date, equalTo: .now, toGranularity: .month) {
-            rows.append((ve.category ?? "Other", ve.amountMinor))
+            rows.append((categoryName(ve.categoryID), ve.amountMinor))
         }
         if subscriptionsMonthlyMinor > 0 {
             rows.append(("Subscriptions", subscriptionsMonthlyMinor))
@@ -191,6 +211,7 @@ struct CashFlowView: View {
     @State private var store = CashFlowStore(
         incomeRepository: CashFlowSampleData.incomeRepository,
         expenseRepository: CashFlowSampleData.expenseRepository,
+        categoryRepository: InMemoryCategoryRepository(),
         subscriptions: SampleData.subscriptions
     )
     @State private var didBind = false
@@ -228,16 +249,16 @@ struct CashFlowView: View {
                 IncomeFormView(income: item) { saved in Task { await store.updateIncome(saved) } }
             }
             .sheet(isPresented: $addingFixed) {
-                FixedExpenseFormView(expense: nil) { saved in Task { await store.addFixed(saved) } }
+                FixedExpenseFormView(expense: nil, categories: store.expenseCategories) { saved in Task { await store.addFixed(saved) } }
             }
             .sheet(item: $editingFixed) { item in
-                FixedExpenseFormView(expense: item) { saved in Task { await store.updateFixed(saved) } }
+                FixedExpenseFormView(expense: item, categories: store.expenseCategories) { saved in Task { await store.updateFixed(saved) } }
             }
             .sheet(isPresented: $addingVariable) {
-                VariableExpenseFormView(expense: nil) { saved in Task { await store.addVariable(saved) } }
+                VariableExpenseFormView(expense: nil, categories: store.expenseCategories) { saved in Task { await store.addVariable(saved) } }
             }
             .sheet(item: $editingVariable) { item in
-                VariableExpenseFormView(expense: item) { saved in Task { await store.updateVariable(saved) } }
+                VariableExpenseFormView(expense: item, categories: store.expenseCategories) { saved in Task { await store.updateVariable(saved) } }
             }
             .task {
                 if !didBind {
@@ -247,6 +268,7 @@ struct CashFlowView: View {
                     store = CashFlowStore(
                         incomeRepository: repositories.income,
                         expenseRepository: repositories.expenses,
+                        categoryRepository: repositories.categories,
                         subscriptions: subs
                     )
                     didBind = true
@@ -394,7 +416,7 @@ struct CashFlowView: View {
                 ForEach(store.fixedExpenses) { item in
                     flowEntryRow(
                         name: item.name,
-                        detail: "\(item.category ?? "Other") · \(item.frequency.rawValue.capitalized)",
+                        detail: "\(store.categoryName(item.categoryID)) · \(item.frequency.rawValue.capitalized)",
                         amount: Money(minorUnits: item.amountMinor, currency: item.currency).formatted(),
                         edit: { editingFixed = item },
                         delete: { Task { await store.deleteFixed(id: item.id) } }
@@ -420,7 +442,7 @@ struct CashFlowView: View {
                 ForEach(store.variableExpenses) { item in
                     flowEntryRow(
                         name: item.name,
-                        detail: "\(item.category ?? "Other") · \(item.date.formatted(date: .abbreviated, time: .omitted))",
+                        detail: "\(store.categoryName(item.categoryID)) · \(item.date.formatted(date: .abbreviated, time: .omitted))",
                         amount: Money(minorUnits: item.amountMinor, currency: item.currency).formatted(),
                         edit: { editingVariable = item },
                         delete: { Task { await store.deleteVariable(id: item.id) } }
@@ -520,6 +542,21 @@ private struct CurrencyPickerRow: View {
     }
 }
 
+/// A category Picker keyed by `Category.id` (ADR-0022). A `nil` tag means
+/// "Uncategorized"; the row resolves names from the supplied categories list.
+private struct CategoryPickerRow: View {
+    let categories: [Domain.Category]
+    @Binding var categoryID: UUID?
+    var body: some View {
+        Picker("Category", selection: $categoryID) {
+            Text("Uncategorized").tag(UUID?.none)
+            ForEach(categories) { category in
+                Text(category.name).tag(UUID?.some(category.id))
+            }
+        }
+    }
+}
+
 /// Parse a major-unit decimal string into minor units for `currency`, or set an error.
 private func parsedMinor(_ raw: String, currency: CurrencyCode, error: inout String?) -> Int64? {
     let trimmed = raw.trimmingCharacters(in: .whitespaces)
@@ -604,20 +641,22 @@ struct IncomeFormView: View {
 
 struct FixedExpenseFormView: View {
     let expense: FixedExpense?
+    let categories: [Domain.Category]
     var onSave: (FixedExpense) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String
     @State private var amount: String
     @State private var currency: CurrencyCode
-    @State private var category: String
+    @State private var categoryID: UUID?
     @State private var frequency: BillingPeriod
     @State private var dueDate: Date
     @State private var autopay: Bool
     @State private var amountError: String?
 
-    init(expense: FixedExpense?, onSave: @escaping (FixedExpense) -> Void) {
+    init(expense: FixedExpense?, categories: [Domain.Category], onSave: @escaping (FixedExpense) -> Void) {
         self.expense = expense
+        self.categories = categories
         self.onSave = onSave
         _name = State(initialValue: expense?.name ?? "")
         let cur = expense?.currency ?? .eur
@@ -625,7 +664,7 @@ struct FixedExpenseFormView: View {
         _amount = State(initialValue: expense.map {
             Money(minorUnits: $0.amountMinor, currency: $0.currency).decimalValue.description
         } ?? "")
-        _category = State(initialValue: expense?.category ?? "")
+        _categoryID = State(initialValue: expense?.categoryID)
         _frequency = State(initialValue: expense?.frequency ?? .monthly)
         _dueDate = State(initialValue: expense?.dueDate ?? .now)
         _autopay = State(initialValue: expense?.autopay ?? false)
@@ -636,7 +675,7 @@ struct FixedExpenseFormView: View {
             Form {
                 Section("Expense") {
                     TextField("Name (e.g. Rent)", text: $name)
-                    TextField("Category (e.g. Housing)", text: $category)
+                    CategoryPickerRow(categories: categories, categoryID: $categoryID)
                 }
                 Section("Amount") {
                     TextField("Amount", text: $amount).keyboardType(.decimalPad)
@@ -671,10 +710,9 @@ struct FixedExpenseFormView: View {
             amountError = "Enter a valid amount (max \(currency.minorUnitDigits) decimals)."
             return
         }
-        let trimmedCategory = category.trimmingCharacters(in: .whitespaces)
         onSave(FixedExpense(
             id: expense?.id ?? UUID(), name: name, amountMinor: minor, currency: currency,
-            category: trimmedCategory.isEmpty ? nil : trimmedCategory, frequency: frequency,
+            categoryID: categoryID, frequency: frequency,
             dueDate: dueDate, autopay: autopay, notes: expense?.notes))
         dismiss()
     }
@@ -682,18 +720,20 @@ struct FixedExpenseFormView: View {
 
 struct VariableExpenseFormView: View {
     let expense: VariableExpense?
+    let categories: [Domain.Category]
     var onSave: (VariableExpense) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String
     @State private var amount: String
     @State private var currency: CurrencyCode
-    @State private var category: String
+    @State private var categoryID: UUID?
     @State private var date: Date
     @State private var amountError: String?
 
-    init(expense: VariableExpense?, onSave: @escaping (VariableExpense) -> Void) {
+    init(expense: VariableExpense?, categories: [Domain.Category], onSave: @escaping (VariableExpense) -> Void) {
         self.expense = expense
+        self.categories = categories
         self.onSave = onSave
         _name = State(initialValue: expense?.name ?? "")
         let cur = expense?.currency ?? .eur
@@ -701,7 +741,7 @@ struct VariableExpenseFormView: View {
         _amount = State(initialValue: expense.map {
             Money(minorUnits: $0.amountMinor, currency: $0.currency).decimalValue.description
         } ?? "")
-        _category = State(initialValue: expense?.category ?? "")
+        _categoryID = State(initialValue: expense?.categoryID)
         _date = State(initialValue: expense?.date ?? .now)
     }
 
@@ -710,7 +750,7 @@ struct VariableExpenseFormView: View {
             Form {
                 Section("Expense") {
                     TextField("Name (e.g. Groceries)", text: $name)
-                    TextField("Category (e.g. Food)", text: $category)
+                    CategoryPickerRow(categories: categories, categoryID: $categoryID)
                 }
                 Section("Amount") {
                     TextField("Amount", text: $amount).keyboardType(.decimalPad)
@@ -739,10 +779,9 @@ struct VariableExpenseFormView: View {
             amountError = "Enter a valid amount (max \(currency.minorUnitDigits) decimals)."
             return
         }
-        let trimmedCategory = category.trimmingCharacters(in: .whitespaces)
         onSave(VariableExpense(
             id: expense?.id ?? UUID(), name: name, amountMinor: minor, currency: currency,
-            category: trimmedCategory.isEmpty ? nil : trimmedCategory, date: date, notes: expense?.notes))
+            categoryID: categoryID, date: date, notes: expense?.notes))
         dismiss()
     }
 }

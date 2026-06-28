@@ -38,6 +38,23 @@ enum SampleData {
                      paymentMethod: .applePay, usageState: .rarely, startDate: .now, sortOrder: 2),
     ]
     static let repository = InMemorySubscriptionRepository(seed: subscriptions)
+
+    /// Stable expense categories (ADR-0022) — the normalized `categories` rows the
+    /// sample fixed/variable expenses reference by id. The in-memory
+    /// `CategoryRepository` returns these same rows so `categoryID → name`
+    /// resolution works offline exactly as it will against Supabase.
+    static let expenseCategories: [Domain.Category] = [
+        Domain.Category(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000C1")!,
+                        name: "Housing", slug: "housing", kind: .expense),
+        Domain.Category(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000C2")!,
+                        name: "Groceries", slug: "groceries", kind: .expense),
+        Domain.Category(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000C3")!,
+                        name: "Transport", slug: "transport", kind: .expense),
+        Domain.Category(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000C4")!,
+                        name: "Utilities", slug: "utilities", kind: .expense),
+        Domain.Category(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000C5")!,
+                        name: "Entertainment", slug: "entertainment", kind: .expense),
+    ]
 }
 
 // MARK: - Store (@Observable, MainActor) — docs/03 unidirectional MVVM

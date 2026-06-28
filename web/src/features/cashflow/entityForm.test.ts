@@ -7,7 +7,7 @@ function draft(overrides: Partial<EntityFormDraft> = {}): EntityFormDraft {
     amount: '3200',
     currency: 'EUR',
     cadence: 'monthly',
-    categoryName: 'Housing',
+    categoryId: '00000000-0000-0000-0000-0000000000C1',
     date: '',
     ...overrides,
   };
@@ -62,14 +62,14 @@ describe('buildFixed', () => {
     if (r.ok) {
       expect(r.value.amountMinor).toBe(110000);
       expect(r.value.billingPeriod).toBe('monthly');
-      expect(r.value.categoryName).toBe('Housing');
+      expect(r.value.categoryId).toBe('00000000-0000-0000-0000-0000000000C1');
       expect(r.value.dueDate).toBe('2026-07-01');
     }
   });
 
-  it('defaults a blank category to Other', () => {
-    const r = buildFixed(draft({ categoryName: '   ' }), 'fix-1');
-    expect(r.ok && r.value.categoryName).toBe('Other');
+  it('maps a blank category to null (uncategorized)', () => {
+    const r = buildFixed(draft({ categoryId: '   ' }), 'fix-1');
+    expect(r.ok && r.value.categoryId).toBeNull();
   });
 });
 
