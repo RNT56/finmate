@@ -1,0 +1,365 @@
+/* Finmate Liquid Glass — the ONE design language for the web client.
+   CSS backdrop-filter glass mirroring the iOS DesignSystem (docs/06). Tokens are
+   the same semantic roles as the iOS Asset Catalog. No Substimate 9-theme sprawl —
+   light/dark via prefers-color-scheme only. */
+
+:root {
+  /* docs/06 §3.1 semantic color roles — LIGHT */
+  --fm-background: #f2f3f7;
+  --fm-background-elevated: #ffffff;
+  --fm-surface: #ffffff;
+  --fm-surface-opaque: #ffffff;
+  --fm-hairline: rgba(0, 0, 0, 0.08);
+  --fm-label: #0a0a0a;
+  --fm-label-secondary: rgba(60, 60, 67, 0.6);
+  --fm-label-tertiary: rgba(60, 60, 67, 0.3);
+  --fm-accent: #0a84ff;
+  --fm-accent-pressed: #0066d6;
+
+  /* docs/06 §3.2 financial semantics */
+  --fm-up: #1f9d55;
+  --fm-down: #d7263d;
+  --fm-neutral: #8a8a8e;
+  --fm-warning: #e8830c;
+  --fm-btc: #f7931a;
+  /* Money-flow palette (docs/06): Subscriptions ≈ violet. */
+  --fm-flow-violet: #8e5cff;
+
+  /* docs/06 §5 spacing / radii */
+  --fm-radius: 22px;
+  --fm-radius-sm: 14px;
+  --fm-card-padding: 16px;
+  --fm-spacing: 12px;
+
+  /* Glass surface (translucent + blur). On reduce-transparency we fall back below. */
+  --fm-glass-fill: rgba(255, 255, 255, 0.55);
+  --fm-glass-border: rgba(255, 255, 255, 0.6);
+  --fm-glass-blur: blur(20px) saturate(180%);
+  --fm-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fm-background: #0b0c0f;
+    --fm-background-elevated: #15171c;
+    --fm-surface: #1b1e25;
+    --fm-surface-opaque: #20232b;
+    --fm-hairline: rgba(255, 255, 255, 0.12);
+    --fm-label: #ffffff;
+    --fm-label-secondary: rgba(235, 235, 245, 0.6);
+    --fm-label-tertiary: rgba(235, 235, 245, 0.3);
+    --fm-accent: #0a84ff;
+    --fm-accent-pressed: #3b9bff;
+
+    --fm-up: #30d158;
+    --fm-down: #ff6961;
+    --fm-neutral: #98989d;
+    --fm-warning: #ffb340;
+    --fm-btc: #ffa62b;
+    --fm-flow-violet: #a989ff;
+
+    --fm-glass-fill: rgba(28, 30, 38, 0.55);
+    --fm-glass-border: rgba(255, 255, 255, 0.12);
+    --fm-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  color: var(--fm-label);
+  /* Deferential scene gradient so glass reads on top (docs/06 §1.1 depth). */
+  background:
+    radial-gradient(1200px 800px at 100% -10%, rgba(10, 132, 255, 0.12), transparent 60%),
+    radial-gradient(900px 700px at -10% 110%, rgba(247, 147, 26, 0.1), transparent 55%),
+    var(--fm-background);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The one glass primitive — mirrors GlassCard / GlassBackground (docs/06 §2.2). */
+.fm-glass {
+  background: var(--fm-glass-fill);
+  -webkit-backdrop-filter: var(--fm-glass-blur);
+  backdrop-filter: var(--fm-glass-blur);
+  border: 1px solid var(--fm-glass-border);
+  border-radius: var(--fm-radius);
+  box-shadow: var(--fm-shadow);
+}
+
+.fm-card {
+  padding: var(--fm-card-padding);
+}
+
+/* Reduce-transparency / no-backdrop fallback -> opaque surface (docs/06 §2.1 Tier C). */
+@media (prefers-reduced-transparency: reduce) {
+  .fm-glass {
+    background: var(--fm-surface-opaque);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .fm-glass {
+    background: var(--fm-surface);
+  }
+}
+
+.fm-mono {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* ---- App shell layout ---- */
+
+.fm-shell {
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  min-height: 100vh;
+}
+
+.fm-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  margin: 14px;
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fm-brand {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 10px 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fm-brand-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--fm-accent), var(--fm-btc));
+}
+
+.fm-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border-radius: var(--fm-radius-sm);
+  color: var(--fm-label-secondary);
+  text-decoration: none;
+  font-weight: 550;
+  font-size: 15px;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.fm-nav-link:hover {
+  color: var(--fm-label);
+  background: var(--fm-hairline);
+}
+
+.fm-nav-link.active {
+  color: var(--fm-label);
+  background: var(--fm-glass-fill);
+  -webkit-backdrop-filter: var(--fm-glass-blur);
+  backdrop-filter: var(--fm-glass-blur);
+  box-shadow: inset 0 0 0 1px var(--fm-glass-border);
+}
+
+.fm-nav-icon {
+  width: 20px;
+  text-align: center;
+}
+
+.fm-main {
+  padding: 28px 32px 64px;
+  max-width: 920px;
+}
+
+.fm-page-title {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 6px 0 22px;
+}
+
+/* ---- Mobile: collapse sidebar into a bottom tab bar ---- */
+
+@media (max-width: 760px) {
+  .fm-shell {
+    grid-template-columns: 1fr;
+  }
+  .fm-sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    height: auto;
+    margin: 10px;
+    padding: 8px;
+    flex-direction: row;
+    justify-content: space-around;
+    z-index: 50;
+  }
+  .fm-brand {
+    display: none;
+  }
+  .fm-nav-link {
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    padding: 6px 8px;
+    flex: 1;
+  }
+  .fm-main {
+    padding: 20px 16px 110px;
+  }
+}
+
+/* ---- Generic UI bits ---- */
+
+.fm-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.fm-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-spacing);
+}
+
+.fm-secondary {
+  color: var(--fm-label-secondary);
+}
+
+.fm-amount {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.fm-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--fm-hairline);
+  color: var(--fm-label-secondary);
+}
+
+.fm-icon-tile {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.18), rgba(247, 147, 26, 0.18));
+  color: var(--fm-accent);
+  flex-shrink: 0;
+}
+
+.fm-btn {
+  font: inherit;
+  font-weight: 600;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  cursor: pointer;
+  color: #fff;
+  background: var(--fm-accent);
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.fm-btn:hover {
+  background: var(--fm-accent-pressed);
+}
+
+.fm-btn:active {
+  transform: scale(0.98);
+}
+
+.fm-btn-ghost {
+  color: var(--fm-accent);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--fm-glass-border);
+}
+
+.fm-btn-ghost:hover {
+  background: var(--fm-hairline);
+}
+
+.fm-input,
+.fm-select {
+  font: inherit;
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: var(--fm-radius-sm);
+  border: 1px solid var(--fm-hairline);
+  background: var(--fm-background-elevated);
+  color: var(--fm-label);
+}
+
+.fm-input:focus,
+.fm-select:focus {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 1px;
+}
+
+.fm-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fm-label-secondary);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.fm-error {
+  color: var(--fm-down);
+  font-size: 13px;
+}
+
+/* ---- Money-flow (M3) ribbons ---- */
+
+/* Translucent ribbons so overlaps read as depth (docs/14 §11.5). */
+.fm-flow-ribbon {
+  opacity: 0.55;
+}
+
+/* Reduce-transparency: solid fills + a hairline edge for separation (docs/14 §11.5). */
+@media (prefers-reduced-transparency: reduce) {
+  .fm-flow-ribbon {
+    opacity: 1;
+    stroke: var(--fm-hairline);
+    stroke-width: 0.5;
+  }
+}
+
+.fm-hero-amount {
+  font-size: 44px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
