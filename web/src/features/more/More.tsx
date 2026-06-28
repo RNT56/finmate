@@ -26,6 +26,12 @@ const ITEMS: MoreItem[] = [
     title: 'BTC Calculator',
     subtitle: 'Convert fiat to BTC and satoshis',
   },
+  {
+    to: '/import',
+    icon: '↧',
+    title: 'Import CSV',
+    subtitle: 'Preview and validate a subscriptions CSV before importing',
+  },
 ];
 
 export function More() {
