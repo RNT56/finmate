@@ -1,0 +1,34 @@
+# XcodeGen spec for the Finmate iOS app (M0 shell + M1 Subscriptions slice).
+# Generates Finmate.xcodeproj that links the local FinmateCore package.
+# Regenerate with: xcodegen generate
+name: Finmate
+options:
+  bundleIdPrefix: app.finmate
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    CODE_SIGNING_ALLOWED: "NO"
+    GENERATE_INFOPLIST_FILE: "YES"
+    INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+    INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: "YES"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+packages:
+  FinmateCore:
+    path: Packages/FinmateCore
+targets:
+  Finmate:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/Sources
+    dependencies:
+      - package: FinmateCore
+        product: Domain
+      - package: FinmateCore
+        product: Shared
