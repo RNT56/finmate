@@ -6,7 +6,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   type AssetSlice,
+  type AssetTransactionKind,
   type FinancialAsset,
+  applyTransaction,
   assetDistribution,
   portfolioCostBasisMinor,
   portfolioGainMinor,
@@ -39,6 +41,19 @@ export interface UseAssets {
   /** Descending-by-value distribution by asset type (converted). */
   distribution: AssetSlice[];
   converter: CurrencyConverter;
+
+  /** Insert or update an asset, then reload (portfolio/gain recompute). */
+  saveAsset: (asset: FinancialAsset) => Promise<void>;
+  /** Delete an asset by id, then reload. */
+  removeAsset: (id: string) => Promise<void>;
+  /**
+   * Apply a buy/sell/dividend/other transaction to an asset under average-cost
+   * basis (pure `applyTransaction`), persist the re-marked asset, then reload.
+   */
+  recordTransaction: (
+    assetId: string,
+    txn: { kind: AssetTransactionKind; quantity: number; priceMinor: number; feesMinor: number },
+  ) => Promise<void>;
 }
 
 export function useAssets(
@@ -57,6 +72,36 @@ export function useAssets(
   useEffect(() => {
     void load();
   }, [load]);
+
+  const saveAsset = useCallback(
+    async (asset: FinancialAsset) => {
+      await repository.upsert(asset);
+      await load();
+    },
+    [repository, load],
+  );
+
+  const removeAsset = useCallback(
+    async (id: string) => {
+      await repository.remove(id);
+      await load();
+    },
+    [repository, load],
+  );
+
+  const recordTransaction = useCallback(
+    async (
+      assetId: string,
+      txn: { kind: AssetTransactionKind; quantity: number; priceMinor: number; feesMinor: number },
+    ) => {
+      const current = await repository.all();
+      const target = current.find((a) => a.id === assetId);
+      if (!target) return;
+      await repository.upsert(applyTransaction(target, txn));
+      await load();
+    },
+    [repository, load],
+  );
 
   const converter = useMemo(() => new CurrencyConverter(SAMPLE_ASSET_RATES), []);
 
@@ -87,5 +132,8 @@ export function useAssets(
     totalGainPct,
     distribution,
     converter,
+    saveAsset,
+    removeAsset,
+    recordTransaction,
   };
 }

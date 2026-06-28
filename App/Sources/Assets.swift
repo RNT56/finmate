@@ -3,6 +3,7 @@ import Charts
 import Observation
 import Domain
 import DataLayer
+import Shared
 
 // MARK: - DataLayer (in-memory) — docs/03 §3. Implements the Domain AssetRepository;
 // the real Supabase-backed implementation swaps in behind the same seam.
@@ -22,6 +23,15 @@ actor InMemoryAssetRepository: AssetRepository {
     }
     func upsert(_ asset: FinancialAsset) async throws { store[asset.id] = asset }
     func delete(id: UUID) async throws { store[id] = nil; txns[id] = nil }
+    func recordTransaction(_ transaction: AssetTransaction) async throws {
+        var list = txns[transaction.assetID] ?? []
+        if let idx = list.firstIndex(where: { $0.id == transaction.id }) {
+            list[idx] = transaction
+        } else {
+            list.append(transaction)
+        }
+        txns[transaction.assetID] = list
+    }
 }
 
 // MARK: - Sample data (matches the web client so the displayed figures agree, M5)
@@ -96,6 +106,40 @@ final class AssetsStore {
         (try? await repository.transactions(assetID: assetID)) ?? []
     }
 
+    // MARK: Mutations — write through the repo, then reload (portfolio recomputes).
+
+    func addAsset(_ asset: FinancialAsset) async {
+        try? await repository.upsert(asset)
+        await load()
+    }
+    func updateAsset(_ asset: FinancialAsset) async {
+        try? await repository.upsert(asset)
+        await load()
+    }
+    func deleteAsset(id: UUID) async {
+        try? await repository.delete(id: id)
+        await load()
+    }
+
+    /// Record a transaction against an asset, then recompute the holding's quantity,
+    /// average-cost basis, and current value from the full history (ADR-0015,
+    /// docs/13 §2) before persisting and reloading. Returns the refreshed asset (or
+    /// nil if it no longer exists) so a pushed detail view can update in place.
+    @discardableResult
+    func recordTransaction(_ txn: AssetTransaction, for asset: FinancialAsset) async -> FinancialAsset? {
+        try? await repository.recordTransaction(txn)
+        let history = await transactions(for: asset.id)
+        let recomputed = AssetValuation.recompute(
+            transactions: history, currentPriceMinor: asset.currentPriceMinor)
+        var updated = asset
+        updated.quantity = recomputed.quantity
+        updated.purchasePriceMinor = recomputed.costBasisMinor
+        updated.valueMinor = recomputed.valueMinor
+        try? await repository.upsert(updated)
+        await load()
+        return assets.first { $0.id == updated.id }
+    }
+
     // MARK: Derived (all via Domain.AssetValuation — never Double for money)
 
     var portfolioValue: Money {
@@ -151,6 +195,8 @@ struct AssetsView: View {
     @State private var store = AssetsStore(
         repository: AssetsSampleData.repository, rates: AssetsSampleData.sampleRates)
     @State private var didBind = false
+    @State private var addingAsset = false
+    @State private var editingAsset: FinancialAsset?
 
     var body: some View {
         ScrollView {
@@ -165,6 +211,18 @@ struct AssetsView: View {
         .navigationTitle("Assets")
         .navigationBarTitleDisplayMode(.large)
         .background(FinmateGradient())
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { addingAsset = true } label: { Image(systemName: "plus") }
+                    .accessibilityLabel("Add asset")
+            }
+        }
+        .sheet(isPresented: $addingAsset) {
+            AssetFormView(asset: nil) { saved in Task { await store.addAsset(saved) } }
+        }
+        .sheet(item: $editingAsset) { item in
+            AssetFormView(asset: item) { saved in Task { await store.updateAsset(saved) } }
+        }
         .navigationDestination(for: FinancialAsset.self) { asset in
             AssetDetailView(asset: asset, store: store)
         }
@@ -293,6 +351,12 @@ struct AssetsView: View {
                              gainPct: AssetValuation.gainPct(asset))
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button { editingAsset = asset } label: { Label("Edit", systemImage: "pencil") }
+                    Button(role: .destructive) {
+                        Task { await store.deleteAsset(id: asset.id) }
+                    } label: { Label("Delete", systemImage: "trash") }
+                }
             }
         }
     }
@@ -347,9 +411,15 @@ struct AssetRow: View {
 // MARK: - Asset detail (value/cost/gain + transactions)
 
 struct AssetDetailView: View {
-    let asset: FinancialAsset
     let store: AssetsStore
+    @State private var asset: FinancialAsset
     @State private var transactions: [AssetTransaction] = []
+    @State private var recordingTxn = false
+
+    init(asset: FinancialAsset, store: AssetsStore) {
+        self.store = store
+        _asset = State(initialValue: asset)
+    }
 
     private var gainMinor: Int64 { AssetValuation.unrealizedGainMinor(asset) }
 
@@ -388,6 +458,22 @@ struct AssetDetailView: View {
         .navigationTitle(asset.name)
         .navigationBarTitleDisplayMode(.inline)
         .background(FinmateGradient())
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { recordingTxn = true } label: { Image(systemName: "plus") }
+                    .accessibilityLabel("Record transaction")
+            }
+        }
+        .sheet(isPresented: $recordingTxn) {
+            TransactionFormView(assetID: asset.id, currency: asset.currency) { txn in
+                Task {
+                    if let refreshed = await store.recordTransaction(txn, for: asset) {
+                        asset = refreshed
+                    }
+                    transactions = await store.transactions(for: asset.id)
+                }
+            }
+        }
         .task { transactions = await store.transactions(for: asset.id) }
     }
 
@@ -463,5 +549,207 @@ struct TransactionRow: View {
             s += " · fee \(Money(minorUnits: transaction.feesMinor, currency: currency).formatted())"
         }
         return s
+    }
+}
+
+// MARK: - Forms (add/edit asset, record transaction) — docs/02 §9
+
+/// Parse a major-unit decimal string into minor units for `currency`, returning nil
+/// on an invalid/over-precision/negative value (via the Domain Money.parse, HALF-UP).
+private func assetParsedMinor(_ raw: String, currency: CurrencyCode) -> Int64? {
+    let trimmed = raw.trimmingCharacters(in: .whitespaces)
+    return try? Money.parse(trimmed, currency: currency).minorUnits
+}
+
+/// Parse a non-negative quantity Decimal, rejecting blanks and negatives.
+private func parsedQuantity(_ raw: String) -> Decimal? {
+    let trimmed = raw.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty, let dec = Decimal(string: trimmed), dec >= 0 else { return nil }
+    return dec
+}
+
+private struct AssetCurrencyPickerRow: View {
+    @Binding var currency: CurrencyCode
+    var body: some View {
+        Picker("Currency", selection: $currency) {
+            ForEach(CurrencyCode.allCases, id: \.self) { code in
+                Text("\(code.symbol) \(code.rawValue)").tag(code)
+            }
+        }
+    }
+}
+
+/// Add or edit a holding — name, type, currency, quantity, total cost basis, and
+/// current per-unit price (the value is quantity × price, all Int64 minor units).
+struct AssetFormView: View {
+    let asset: FinancialAsset?
+    var onSave: (FinancialAsset) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name: String
+    @State private var type: AssetType
+    @State private var currency: CurrencyCode
+    @State private var quantity: String
+    @State private var costBasis: String
+    @State private var currentPrice: String
+    @State private var error: String?
+
+    init(asset: FinancialAsset?, onSave: @escaping (FinancialAsset) -> Void) {
+        self.asset = asset
+        self.onSave = onSave
+        _name = State(initialValue: asset?.name ?? "")
+        _type = State(initialValue: asset?.type ?? .stock)
+        let cur = asset?.currency ?? .eur
+        _currency = State(initialValue: cur)
+        _quantity = State(initialValue: asset.map { NSDecimalNumber(decimal: $0.quantity).stringValue } ?? "")
+        _costBasis = State(initialValue: asset.map {
+            Money(minorUnits: $0.purchasePriceMinor, currency: $0.currency).decimalValue.description
+        } ?? "")
+        _currentPrice = State(initialValue: asset.map {
+            Money(minorUnits: $0.currentPriceMinor, currency: $0.currency).decimalValue.description
+        } ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Holding") {
+                    TextField("Name (e.g. Bitcoin)", text: $name)
+                    Picker("Type", selection: $type) {
+                        ForEach(AssetType.allCases, id: \.self) { t in
+                            Text(t.displayName).tag(t)
+                        }
+                    }
+                    AssetCurrencyPickerRow(currency: $currency)
+                }
+                Section("Position") {
+                    TextField("Quantity", text: $quantity).keyboardType(.decimalPad)
+                    TextField("Total cost basis", text: $costBasis).keyboardType(.decimalPad)
+                    TextField("Current per-unit price", text: $currentPrice).keyboardType(.decimalPad)
+                    if let error {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle(asset == nil ? "Add Asset" : "Edit Asset")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save).disabled(name.isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        guard let qty = parsedQuantity(quantity) else {
+            error = "Enter a valid (non-negative) quantity."
+            return
+        }
+        guard let cost = assetParsedMinor(costBasis, currency: currency) else {
+            error = "Enter a valid cost basis (max \(currency.minorUnitDigits) decimals)."
+            return
+        }
+        guard let price = assetParsedMinor(currentPrice, currency: currency) else {
+            error = "Enter a valid per-unit price (max \(currency.minorUnitDigits) decimals)."
+            return
+        }
+        // value = quantity × per-unit price, rounded HALF-UP to Int64 minor units.
+        let value = roundHalfUpToInt64(qty * Decimal(price))
+        onSave(FinancialAsset(
+            id: asset?.id ?? UUID(), name: name, type: type, currency: currency,
+            quantity: qty, purchasePriceMinor: cost, currentPriceMinor: price,
+            valueMinor: value, notes: asset?.notes))
+        dismiss()
+    }
+}
+
+/// Record a buy/sell/dividend/other transaction against an asset — quantity,
+/// per-unit price, fees, and date. The store recomputes the holding after saving.
+struct TransactionFormView: View {
+    let assetID: UUID
+    let currency: CurrencyCode
+    var onSave: (AssetTransaction) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var kind: AssetTransactionKind = .buy
+    @State private var quantity = ""
+    @State private var price = ""
+    @State private var fees = ""
+    @State private var date = Date.now
+    @State private var notes = ""
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Transaction") {
+                    Picker("Kind", selection: $kind) {
+                        ForEach(AssetTransactionKind.allCases, id: \.self) { k in
+                            Text(k.displayName).tag(k)
+                        }
+                    }
+                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                }
+                if kind == .buy || kind == .sell {
+                    Section("Details") {
+                        TextField("Quantity", text: $quantity).keyboardType(.decimalPad)
+                        TextField("Per-unit price", text: $price).keyboardType(.decimalPad)
+                        TextField("Fees", text: $fees).keyboardType(.decimalPad)
+                    }
+                }
+                Section("Notes") {
+                    TextField("Notes (optional)", text: $notes)
+                }
+                if let error {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle("Record Transaction")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespaces)
+        let noteValue = trimmedNotes.isEmpty ? nil : trimmedNotes
+
+        if kind == .buy || kind == .sell {
+            guard let qty = parsedQuantity(quantity) else {
+                error = "Enter a valid (non-negative) quantity."
+                return
+            }
+            guard let priceMinor = assetParsedMinor(price, currency: currency) else {
+                error = "Enter a valid per-unit price (max \(currency.minorUnitDigits) decimals)."
+                return
+            }
+            // Fees are optional; blank → 0, but any entered value must be valid.
+            let feesTrimmed = fees.trimmingCharacters(in: .whitespaces)
+            let feesMinor: Int64
+            if feesTrimmed.isEmpty {
+                feesMinor = 0
+            } else if let parsedFees = assetParsedMinor(feesTrimmed, currency: currency) {
+                feesMinor = parsedFees
+            } else {
+                error = "Enter a valid fee amount."
+                return
+            }
+            onSave(AssetTransaction(
+                assetID: assetID, kind: kind, quantity: qty, priceMinor: priceMinor,
+                feesMinor: feesMinor, date: date, notes: noteValue))
+        } else {
+            // dividend / other — quantity & price are not part of the average-cost math.
+            onSave(AssetTransaction(
+                assetID: assetID, kind: kind, quantity: 0, priceMinor: 0,
+                feesMinor: 0, date: date, notes: noteValue))
+        }
+        dismiss()
     }
 }

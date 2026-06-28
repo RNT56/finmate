@@ -7,6 +7,7 @@ import {
   portfolioCostBasisMinor,
   portfolioGainMinor,
   assetDistribution,
+  applyTransaction,
 } from './assets';
 import { CurrencyConverter, type ExchangeRates } from './currency';
 
@@ -152,5 +153,89 @@ describe('assetDistribution', () => {
 
   it('empty portfolio -> no slices', () => {
     expect(assetDistribution([], 'EUR', eurConverter)).toEqual([]);
+  });
+});
+
+describe('applyTransaction (average-cost basis)', () => {
+  // ETF: qty 10, total cost 150_000, per-unit price 18_000, value 180_000.
+  it('buy adds quantity, adds qty*price+fees to cost basis, re-marks value', () => {
+    const next = applyTransaction(worldEtf, {
+      kind: 'buy',
+      quantity: 5,
+      priceMinor: 20_000, // per-unit
+      feesMinor: 1_000,
+    });
+    expect(next.quantity).toBe(15);
+    // 150_000 + 5*20_000 + 1_000 = 251_000
+    expect(next.purchasePriceMinor).toBe(251_000);
+    expect(next.currentPriceMinor).toBe(20_000);
+    // value = 15 * 20_000 = 300_000
+    expect(next.valueMinor).toBe(300_000);
+  });
+
+  it('sell removes basis at the average unit cost (realized P/L excluded) and re-marks value', () => {
+    // avg unit cost = 150_000 / 10 = 15_000. Sell 4 -> remove 60_000 basis.
+    const next = applyTransaction(worldEtf, {
+      kind: 'sell',
+      quantity: 4,
+      priceMinor: 25_000,
+      feesMinor: 0,
+    });
+    expect(next.quantity).toBe(6);
+    expect(next.purchasePriceMinor).toBe(90_000); // 150_000 - 60_000
+    expect(next.currentPriceMinor).toBe(25_000);
+    expect(next.valueMinor).toBe(150_000); // 6 * 25_000
+  });
+
+  it('selling the whole position resets quantity and cost basis to 0', () => {
+    const next = applyTransaction(worldEtf, {
+      kind: 'sell',
+      quantity: 10,
+      priceMinor: 19_000,
+      feesMinor: 0,
+    });
+    expect(next.quantity).toBe(0);
+    expect(next.purchasePriceMinor).toBe(0);
+    expect(next.valueMinor).toBe(0);
+  });
+
+  it('over-selling clamps quantity at 0 (cannot go negative)', () => {
+    const next = applyTransaction(worldEtf, {
+      kind: 'sell',
+      quantity: 99,
+      priceMinor: 19_000,
+      feesMinor: 0,
+    });
+    expect(next.quantity).toBe(0);
+    expect(next.purchasePriceMinor).toBe(0);
+  });
+
+  it('dividend/other do not change quantity or cost basis but can re-mark price', () => {
+    const div = applyTransaction(worldEtf, {
+      kind: 'dividend',
+      quantity: 0,
+      priceMinor: 19_000,
+      feesMinor: 0,
+    });
+    expect(div.quantity).toBe(10);
+    expect(div.purchasePriceMinor).toBe(150_000);
+    expect(div.currentPriceMinor).toBe(19_000);
+    expect(div.valueMinor).toBe(190_000); // re-marked: 10 * 19_000
+
+    // priceMinor 0 leaves the per-unit price untouched.
+    const other = applyTransaction(worldEtf, {
+      kind: 'other',
+      quantity: 0,
+      priceMinor: 0,
+      feesMinor: 0,
+    });
+    expect(other.currentPriceMinor).toBe(18_000);
+    expect(other.valueMinor).toBe(180_000);
+  });
+
+  it('is pure — does not mutate the input asset', () => {
+    const before = { ...worldEtf };
+    applyTransaction(worldEtf, { kind: 'buy', quantity: 1, priceMinor: 20_000, feesMinor: 0 });
+    expect(worldEtf).toEqual(before);
   });
 });

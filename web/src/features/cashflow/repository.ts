@@ -64,21 +64,53 @@ export const sampleVariableExpenses: VariableExpense[] = [
 ];
 
 export class InMemoryCashFlowRepository implements CashFlowRepository {
+  private incomeStore: Map<string, IncomeSource>;
+  private fixedStore: Map<string, FixedExpense>;
+  private variableStore: Map<string, VariableExpense>;
+
   constructor(
-    private readonly seedIncomes: IncomeSource[] = sampleIncomes,
-    private readonly seedFixed: FixedExpense[] = sampleFixedExpenses,
-    private readonly seedVariable: VariableExpense[] = sampleVariableExpenses,
-  ) {}
+    seedIncomes: IncomeSource[] = sampleIncomes,
+    seedFixed: FixedExpense[] = sampleFixedExpenses,
+    seedVariable: VariableExpense[] = sampleVariableExpenses,
+  ) {
+    this.incomeStore = new Map(seedIncomes.map((i) => [i.id, { ...i }]));
+    this.fixedStore = new Map(seedFixed.map((e) => [e.id, { ...e }]));
+    this.variableStore = new Map(seedVariable.map((e) => [e.id, { ...e }]));
+  }
 
   async incomes(): Promise<IncomeSource[]> {
-    return this.seedIncomes.map((i) => ({ ...i }));
+    return [...this.incomeStore.values()].map((i) => ({ ...i }));
   }
 
   async fixedExpenses(): Promise<FixedExpense[]> {
-    return this.seedFixed.map((e) => ({ ...e }));
+    return [...this.fixedStore.values()].map((e) => ({ ...e }));
   }
 
   async variableExpenses(): Promise<VariableExpense[]> {
-    return this.seedVariable.map((e) => ({ ...e }));
+    return [...this.variableStore.values()].map((e) => ({ ...e }));
+  }
+
+  async upsertIncome(income: IncomeSource): Promise<void> {
+    this.incomeStore.set(income.id, { ...income });
+  }
+
+  async deleteIncome(id: string): Promise<void> {
+    this.incomeStore.delete(id);
+  }
+
+  async upsertFixed(expense: FixedExpense): Promise<void> {
+    this.fixedStore.set(expense.id, { ...expense });
+  }
+
+  async deleteFixed(id: string): Promise<void> {
+    this.fixedStore.delete(id);
+  }
+
+  async upsertVariable(expense: VariableExpense): Promise<void> {
+    this.variableStore.set(expense.id, { ...expense });
+  }
+
+  async deleteVariable(id: string): Promise<void> {
+    this.variableStore.delete(id);
   }
 }

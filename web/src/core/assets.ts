@@ -9,7 +9,7 @@
 // Int64 minor units; in TS integer `number` (well below Number.MAX_SAFE_INTEGER).
 
 import type { CurrencyCode } from './currency';
-import { CurrencyConverter } from './currency';
+import { CurrencyConverter, roundHalfUp } from './currency';
 
 /** Asset class (docs/05 §3.7 financial_assets.type). Mirrors Swift `AssetType`. */
 export type AssetType = 'crypto' | 'stock' | 'etf' | 'cash' | 'other';
@@ -63,6 +63,68 @@ export interface AssetTransaction {
   /** ISO date the transaction occurred. */
   date: string;
   notes: string | null;
+}
+
+// MARK: - Average-cost transaction application (docs/02 §9; docs/13; ADR-0015)
+
+/**
+ * Apply a buy/sell/dividend/other transaction to an asset under AVERAGE-COST basis
+ * (ADR-0015), returning a NEW asset (pure, non-mutating). Money stays integer minor
+ * units; `currentPriceMinor` is the latest per-unit price and re-marks `valueMinor`.
+ *
+ *   buy   → quantity += qty; costBasis += qty*price + fees; mark to `price`.
+ *   sell  → reduces quantity and removes cost basis at the *average* unit cost
+ *           (so realized P/L is excluded from the remaining basis); mark to `price`.
+ *   dividend / other → no quantity/basis change; only re-marks the per-unit price
+ *           when a positive `priceMinor` is supplied.
+ *
+ * `valueMinor` is always recomputed as quantity × currentPriceMinor (HALF-UP), so the
+ * portfolio value/gain recompute after every write. Quantity is clamped at ≥ 0 and a
+ * fully-closed position resets the cost basis to 0.
+ */
+export function applyTransaction(
+  asset: FinancialAsset,
+  txn: { kind: AssetTransactionKind; quantity: number; priceMinor: number; feesMinor: number },
+): FinancialAsset {
+  const qty = Math.max(0, txn.quantity);
+  const price = Math.max(0, txn.priceMinor);
+  const fees = Math.max(0, txn.feesMinor);
+
+  let quantity = asset.quantity;
+  let costBasis = asset.purchasePriceMinor;
+  let currentPrice = asset.currentPriceMinor;
+
+  switch (txn.kind) {
+    case 'buy': {
+      quantity = asset.quantity + qty;
+      costBasis = asset.purchasePriceMinor + qty * price + fees;
+      if (price > 0) currentPrice = price;
+      break;
+    }
+    case 'sell': {
+      const avgUnitCost = asset.quantity > 0 ? asset.purchasePriceMinor / asset.quantity : 0;
+      const sold = Math.min(qty, asset.quantity);
+      quantity = asset.quantity - sold;
+      // Remove basis proportionally at the average unit cost (realized P/L excluded).
+      costBasis = quantity <= 0 ? 0 : asset.purchasePriceMinor - avgUnitCost * sold;
+      if (price > 0) currentPrice = price;
+      break;
+    }
+    case 'dividend':
+    case 'other': {
+      if (price > 0) currentPrice = price;
+      break;
+    }
+  }
+
+  const value = roundHalfUp(quantity * currentPrice);
+  return {
+    ...asset,
+    quantity,
+    purchasePriceMinor: roundHalfUp(costBasis),
+    currentPriceMinor: roundHalfUp(currentPrice),
+    valueMinor: value,
+  };
 }
 
 // MARK: - Per-asset unrealized gain (ADR-0015)

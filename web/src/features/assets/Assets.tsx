@@ -17,6 +17,8 @@ import {
   unrealizedGainMinor,
 } from '../../core/assets';
 import { useAssets } from './useAssets';
+import { AssetModal } from './AssetModal';
+import { TransactionModal } from './TransactionModal';
 
 const DISPLAY_CURRENCIES: CurrencyCode[] = ['EUR', 'USD', 'BTC'];
 
@@ -38,7 +40,14 @@ export function Assets() {
     totalGainMinor,
     totalGainPct,
     distribution,
+    saveAsset,
+    removeAsset,
+    recordTransaction,
   } = useAssets(displayCurrency);
+
+  // null = closed; { existing: null } = add; { existing: asset } = edit.
+  const [assetModal, setAssetModal] = useState<{ existing: FinancialAsset | null } | null>(null);
+  const [txnAsset, setTxnAsset] = useState<FinancialAsset | null>(null);
 
   const fmt = (minor: number) => formatMoney(minor, displayCurrency);
   const gainPositive = totalGainMinor >= 0;
@@ -136,14 +145,30 @@ export function Assets() {
 
         <GlassCard>
           <div
-            className="fm-secondary"
-            style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}
+            className="fm-row"
+            style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}
           >
-            Holdings
+            <span className="fm-secondary" style={{ fontWeight: 600, fontSize: 14 }}>
+              Holdings
+            </span>
+            <button
+              type="button"
+              className="fm-btn"
+              style={{ padding: '6px 12px', fontSize: 13 }}
+              onClick={() => setAssetModal({ existing: null })}
+            >
+              + Add asset
+            </button>
           </div>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {assets.map((a) => (
-              <AssetRow key={a.id} asset={a} />
+              <AssetRow
+                key={a.id}
+                asset={a}
+                onEdit={() => setAssetModal({ existing: a })}
+                onTransaction={() => setTxnAsset(a)}
+                onDelete={() => void removeAsset(a.id)}
+              />
             ))}
             {!loading && assets.length === 0 && (
               <li className="fm-secondary" style={{ padding: '8px 0' }}>
@@ -153,6 +178,28 @@ export function Assets() {
           </ul>
         </GlassCard>
       </div>
+
+      {assetModal && (
+        <AssetModal
+          existing={assetModal.existing}
+          onClose={() => setAssetModal(null)}
+          onSave={async (asset) => {
+            await saveAsset(asset);
+            setAssetModal(null);
+          }}
+        />
+      )}
+
+      {txnAsset && (
+        <TransactionModal
+          asset={txnAsset}
+          onClose={() => setTxnAsset(null)}
+          onSubmit={async (input) => {
+            await recordTransaction(txnAsset.id, input);
+            setTxnAsset(null);
+          }}
+        />
+      )}
     </Page>
   );
 }
@@ -183,7 +230,17 @@ function CurrencySwitcher({
 }
 
 /** A holding row shown in its own native currency (the per-asset figures are stored). */
-function AssetRow({ asset }: { asset: FinancialAsset }) {
+function AssetRow({
+  asset,
+  onEdit,
+  onTransaction,
+  onDelete,
+}: {
+  asset: FinancialAsset;
+  onEdit: () => void;
+  onTransaction: () => void;
+  onDelete: () => void;
+}) {
   const gain = unrealizedGainMinor(asset);
   const pct = gainPct(asset) * 100;
   const positive = gain >= 0;
@@ -195,6 +252,7 @@ function AssetRow({ asset }: { asset: FinancialAsset }) {
         gap: 14,
         padding: '10px 0',
         borderTop: '1px solid var(--fm-glass-border)',
+        flexWrap: 'wrap',
       }}
     >
       <span className="fm-icon-tile" style={{ color: TYPE_COLOR[asset.type] }} aria-hidden="true">
@@ -220,6 +278,35 @@ function AssetRow({ asset }: { asset: FinancialAsset }) {
           {positive ? '+' : '−'}
           {formatMoney(Math.abs(gain), asset.currency)} ({pct.toFixed(1)}%)
         </span>
+      </span>
+      <span className="fm-row" style={{ gap: 6 }}>
+        <button
+          type="button"
+          className="fm-btn fm-btn-ghost"
+          style={{ padding: '6px 10px', fontSize: 13 }}
+          aria-label={`Record transaction for ${asset.name}`}
+          onClick={onTransaction}
+        >
+          Txn
+        </button>
+        <button
+          type="button"
+          className="fm-btn fm-btn-ghost"
+          style={{ padding: '6px 10px', fontSize: 13 }}
+          aria-label={`Edit ${asset.name}`}
+          onClick={onEdit}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          className="fm-btn fm-btn-ghost"
+          style={{ padding: '6px 10px', fontSize: 13 }}
+          aria-label={`Delete ${asset.name}`}
+          onClick={onDelete}
+        >
+          Delete
+        </button>
       </span>
     </li>
   );

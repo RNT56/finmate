@@ -31,6 +31,13 @@ export interface UseCashFlow {
   subscriptionsMinor: number;
   breakdown: ExpenseBreakdownRow[];
   displayCurrency: CurrencyCode;
+
+  addIncome: (income: IncomeSource) => Promise<void>;
+  removeIncome: (id: string) => Promise<void>;
+  addFixed: (expense: FixedExpense) => Promise<void>;
+  removeFixed: (id: string) => Promise<void>;
+  addVariable: (expense: VariableExpense) => Promise<void>;
+  removeVariable: (id: string) => Promise<void>;
 }
 
 const DISPLAY_CURRENCY: CurrencyCode = 'EUR';
@@ -63,6 +70,49 @@ export function useCashFlow(
   useEffect(() => {
     void load();
   }, [load]);
+
+  const addIncome = useCallback(
+    async (income: IncomeSource) => {
+      await repository.upsertIncome(income);
+      await load();
+    },
+    [repository, load],
+  );
+  const removeIncome = useCallback(
+    async (id: string) => {
+      await repository.deleteIncome(id);
+      await load();
+    },
+    [repository, load],
+  );
+  const addFixed = useCallback(
+    async (expense: FixedExpense) => {
+      await repository.upsertFixed(expense);
+      await load();
+    },
+    [repository, load],
+  );
+  const removeFixed = useCallback(
+    async (id: string) => {
+      await repository.deleteFixed(id);
+      await load();
+    },
+    [repository, load],
+  );
+  const addVariable = useCallback(
+    async (expense: VariableExpense) => {
+      await repository.upsertVariable(expense);
+      await load();
+    },
+    [repository, load],
+  );
+  const removeVariable = useCallback(
+    async (id: string) => {
+      await repository.deleteVariable(id);
+      await load();
+    },
+    [repository, load],
+  );
 
   const fixedMinor = useMemo(
     () => fixedExpenses.reduce((sum, e) => sum + fixedMonthlyAmountMinor(e), 0),
@@ -115,6 +165,12 @@ export function useCashFlow(
     subscriptionsMinor,
     breakdown,
     displayCurrency: DISPLAY_CURRENCY,
+    addIncome,
+    removeIncome,
+    addFixed,
+    removeFixed,
+    addVariable,
+    removeVariable,
   };
 }
 

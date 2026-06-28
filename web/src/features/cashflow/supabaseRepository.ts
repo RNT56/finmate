@@ -58,6 +58,43 @@ export function variableExpenseFromRow(
   };
 }
 
+/** Domain -> Insert/Update payload. Omits `user_id` (RLS owner default) and the
+ *  server-managed timestamps. */
+export function incomeToRow(income: IncomeSource): Partial<IncomeSourceRow> {
+  return {
+    id: income.id,
+    name: income.name,
+    amount_minor: income.amountMinor,
+    currency: income.currency,
+    frequency: income.frequency,
+    next_payment: income.nextPayment,
+  };
+}
+
+/** Domain -> Insert/Update payload. `categoryName` is a join-derived label, not a
+ *  column, so it is not persisted here (matches the read mapper's '' default). */
+export function fixedExpenseToRow(expense: FixedExpense): Partial<FixedExpenseRow> {
+  return {
+    id: expense.id,
+    name: expense.name,
+    amount_minor: expense.amountMinor,
+    currency: expense.currency,
+    billing_period: expense.billingPeriod,
+    due_date: expense.dueDate,
+  };
+}
+
+/** Domain -> Insert/Update payload (see `fixedExpenseToRow` re: category). */
+export function variableExpenseToRow(expense: VariableExpense): Partial<VariableExpenseRow> {
+  return {
+    id: expense.id,
+    name: expense.name,
+    amount_minor: expense.amountMinor,
+    currency: expense.currency,
+    spent_on: expense.spentOn,
+  };
+}
+
 export class SupabaseCashFlowRepository implements CashFlowRepository {
   constructor(private readonly client: SupabaseClient<Database>) {}
 
@@ -86,5 +123,41 @@ export class SupabaseCashFlowRepository implements CashFlowRepository {
       .order('spent_on', { ascending: false });
     if (error) throw error;
     return (data ?? []).map((row) => variableExpenseFromRow(row));
+  }
+
+  async upsertIncome(income: IncomeSource): Promise<void> {
+    const { error } = await this.client
+      .from('income_sources')
+      .upsert(incomeToRow(income), { onConflict: 'id' });
+    if (error) throw error;
+  }
+
+  async deleteIncome(id: string): Promise<void> {
+    const { error } = await this.client.from('income_sources').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  async upsertFixed(expense: FixedExpense): Promise<void> {
+    const { error } = await this.client
+      .from('fixed_expenses')
+      .upsert(fixedExpenseToRow(expense), { onConflict: 'id' });
+    if (error) throw error;
+  }
+
+  async deleteFixed(id: string): Promise<void> {
+    const { error } = await this.client.from('fixed_expenses').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  async upsertVariable(expense: VariableExpense): Promise<void> {
+    const { error } = await this.client
+      .from('variable_expenses')
+      .upsert(variableExpenseToRow(expense), { onConflict: 'id' });
+    if (error) throw error;
+  }
+
+  async deleteVariable(id: string): Promise<void> {
+    const { error } = await this.client.from('variable_expenses').delete().eq('id', id);
+    if (error) throw error;
   }
 }

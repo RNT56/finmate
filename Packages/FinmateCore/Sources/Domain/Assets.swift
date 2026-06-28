@@ -95,6 +95,9 @@ public protocol AssetRepository: Sendable {
     func transactions(assetID: UUID) async throws -> [AssetTransaction]
     func upsert(_ asset: FinancialAsset) async throws
     func delete(id: UUID) async throws
+    /// Append (or update) a transaction against an asset. The caller is responsible
+    /// for recomputing + persisting the holding's average-cost fields (docs/13 §2).
+    func recordTransaction(_ transaction: AssetTransaction) async throws
 }
 
 // MARK: - Asset valuation math (ADR-0015, docs/13 §2 conversion)
@@ -174,6 +177,55 @@ public enum AssetValuation {
             return AssetDistributionSlice(type: type, totalMinor: slice.totalMinor,
                                           count: slice.count, share: slice.share)
         }
+    }
+
+    /// Recomputed average-cost holding fields derived from a transaction history.
+    public struct RecomputedHolding: Equatable, Sendable {
+        public let quantity: Decimal
+        /// TOTAL average-cost basis of the remaining position, in minor units.
+        public let costBasisMinor: Int64
+        /// Current TOTAL value = remaining quantity × current per-unit price.
+        public let valueMinor: Int64
+
+        public init(quantity: Decimal, costBasisMinor: Int64, valueMinor: Int64) {
+            self.quantity = quantity
+            self.costBasisMinor = costBasisMinor
+            self.valueMinor = valueMinor
+        }
+    }
+
+    /// Recompute a holding's quantity, cost basis, and value from its transaction
+    /// history under the ADR-0015 average-cost method (docs/13 §2). Buys add
+    /// quantity and `quantity × price + fees` to the cost basis; sells remove
+    /// quantity and proportionally reduce the cost basis at the running average
+    /// cost; dividend/other leave quantity and basis unchanged. The returned value
+    /// is the remaining quantity × the supplied current per-unit price. All money is
+    /// `Int64` minor units; `Decimal` is used only for the quantity/average math.
+    public static func recompute(
+        transactions: [AssetTransaction], currentPriceMinor: Int64
+    ) -> RecomputedHolding {
+        var quantity = Decimal(0)
+        var costBasis = Decimal(0)          // total cost basis in minor units
+        for txn in transactions.sorted(by: { $0.date < $1.date }) {
+            switch txn.kind {
+            case .buy:
+                quantity += txn.quantity
+                costBasis += txn.quantity * Decimal(txn.priceMinor) + Decimal(txn.feesMinor)
+            case .sell:
+                let avg = quantity > 0 ? costBasis / quantity : 0
+                let sold = min(txn.quantity, quantity)
+                quantity -= sold
+                costBasis -= avg * sold
+                if quantity <= 0 { quantity = 0; costBasis = 0 }
+            case .dividend, .other:
+                break
+            }
+        }
+        let value = quantity * Decimal(currentPriceMinor)
+        return RecomputedHolding(
+            quantity: quantity,
+            costBasisMinor: roundHalfUpToInt64(costBasis),
+            valueMinor: roundHalfUpToInt64(value))
     }
 
     // MARK: Private

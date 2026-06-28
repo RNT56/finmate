@@ -113,4 +113,56 @@ import Foundation
             Money(minorUnits: 550_000, currency: .usd), converter: converter)
         #expect(result.sats == 10_000_000)
     }
+
+    // MARK: Average-cost recompute from transactions (ADR-0015, docs/13 §2)
+
+    @Test func recomputeAverageCostFromBuys() {
+        let id = UUID()
+        // Two buys: 0.3 @ 3_500_000 + fee 1_500, then 0.2 @ 4_700_000 + fee 1_000.
+        // qty = 0.5; cost = 0.3*3_500_000 + 1_500 + 0.2*4_700_000 + 1_000
+        //              = 1_050_000 + 1_500 + 940_000 + 1_000 = 1_992_500.
+        // value @ current 5_000_000/unit = 0.5 * 5_000_000 = 2_500_000.
+        let txns = [
+            AssetTransaction(assetID: id, kind: .buy, quantity: Decimal(string: "0.3")!,
+                             priceMinor: 3_500_000, feesMinor: 1_500, date: Date(timeIntervalSince1970: 100)),
+            AssetTransaction(assetID: id, kind: .buy, quantity: Decimal(string: "0.2")!,
+                             priceMinor: 4_700_000, feesMinor: 1_000, date: Date(timeIntervalSince1970: 200)),
+        ]
+        let h = AssetValuation.recompute(transactions: txns, currentPriceMinor: 5_000_000)
+        #expect(h.quantity == Decimal(string: "0.5")!)
+        #expect(h.costBasisMinor == 1_992_500)
+        #expect(h.valueMinor == 2_500_000)
+    }
+
+    @Test func recomputeSellReducesBasisAtAverageCost() {
+        let id = UUID()
+        // Buy 10 @ 100 (cost 1_000), sell 4. Average cost = 100/unit.
+        // Remaining qty 6, basis 600; value @ 150/unit = 900. Dividend leaves it unchanged.
+        let txns = [
+            AssetTransaction(assetID: id, kind: .buy, quantity: 10,
+                             priceMinor: 100, feesMinor: 0, date: Date(timeIntervalSince1970: 100)),
+            AssetTransaction(assetID: id, kind: .sell, quantity: 4,
+                             priceMinor: 200, feesMinor: 0, date: Date(timeIntervalSince1970: 200)),
+            AssetTransaction(assetID: id, kind: .dividend, quantity: 0,
+                             priceMinor: 0, feesMinor: 0, date: Date(timeIntervalSince1970: 300)),
+        ]
+        let h = AssetValuation.recompute(transactions: txns, currentPriceMinor: 150)
+        #expect(h.quantity == 6)
+        #expect(h.costBasisMinor == 600)
+        #expect(h.valueMinor == 900)
+    }
+
+    @Test func recomputeFullSellZeroesPosition() {
+        let id = UUID()
+        let txns = [
+            AssetTransaction(assetID: id, kind: .buy, quantity: 5,
+                             priceMinor: 1_000, feesMinor: 50, date: Date(timeIntervalSince1970: 100)),
+            AssetTransaction(assetID: id, kind: .sell, quantity: 5,
+                             priceMinor: 1_200, feesMinor: 0, date: Date(timeIntervalSince1970: 200)),
+        ]
+        let h = AssetValuation.recompute(transactions: txns, currentPriceMinor: 1_200)
+        #expect(h.quantity == 0)
+        #expect(h.costBasisMinor == 0)
+        #expect(h.valueMinor == 0)
+    }
 }
