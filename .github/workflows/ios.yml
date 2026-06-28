@@ -29,8 +29,37 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Run Domain unit tests (FinmateCore)
-        run: swift test --package-path Packages/FinmateCore
+      - name: Run Domain unit tests (FinmateCore) with coverage
+        run: swift test --package-path Packages/FinmateCore --enable-code-coverage
+
+      - name: Domain coverage sanity check
+        run: |
+          set -euo pipefail
+          BIN=$(swift build --package-path Packages/FinmateCore --show-bin-path)
+          XCTEST=$(find "$BIN" -name '*.xctest' -maxdepth 2 | head -n 1)
+          PROF="$BIN/codecov/default.profdata"
+          if [ -z "$XCTEST" ] || [ ! -f "$PROF" ]; then
+            echo "::warning::coverage artifacts not found; skipping threshold check"
+            exit 0
+          fi
+          # Locate the test runner binary inside the .xctest bundle.
+          EXE="$XCTEST/Contents/MacOS/$(basename "$XCTEST" .xctest)"
+          [ -f "$EXE" ] || EXE=$(find "$XCTEST" -type f -perm +111 | head -n 1)
+          # Report Domain line coverage and fail if it falls below a conservative floor.
+          LINES=$(xcrun llvm-cov report "$EXE" -instr-profile "$PROF" \
+            -ignore-filename-regex='.*/(Tests|checkouts|.build)/.*' 2>/dev/null \
+            | awk '/Domain\// {print}' || true)
+          echo "$LINES"
+          PCT=$(xcrun llvm-cov report "$EXE" -instr-profile "$PROF" \
+            -ignore-filename-regex='.*/(Tests|checkouts|.build)/.*' 2>/dev/null \
+            | awk '/^TOTAL/ {gsub("%","",$(NF-3)); print $(NF-3)}' || echo "0")
+          echo "Total line coverage: ${PCT}%"
+          THRESHOLD=40
+          # Use awk for the float comparison; never fail the build on a parse miss.
+          if [ -n "$PCT" ] && awk "BEGIN{exit !($PCT < $THRESHOLD)}"; then
+            echo "::error::Line coverage ${PCT}% below ${THRESHOLD}% floor"
+            exit 1
+          fi
 
       - name: SwiftLint (non-blocking if not installed)
         run: |
@@ -47,3 +76,11 @@ jobs:
             -scheme Finmate \
             -destination 'platform=iOS Simulator,name=iPhone 17' \
             build
+
+      - name: Run store-layer unit tests (FinmateAppTests) with coverage
+        run: |
+          xcodebuild test \
+            -project Finmate.xcodeproj \
+            -scheme Finmate \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -enableCodeCoverage YES
