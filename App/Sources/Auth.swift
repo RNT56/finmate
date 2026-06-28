@@ -182,6 +182,7 @@ struct AuthView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.large)
+        .accessibilityIdentifier("auth.tryDemo")
         .accessibilityHint("Explore the app offline with sample data, no account needed")
     }
 
@@ -290,6 +291,7 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .accessibilityIdentifier("onboarding.continue")
             }
             .padding()
         }

@@ -32,6 +32,14 @@ struct FinmateApp: App {
         _preferencesStore = State(initialValue: store)
         _appLock = State(initialValue: AppLockController(preferencesStore: store))
         _authStore = State(initialValue: AuthStore(repository: repositories.auth))
+
+        // Test-only: UI smoke tests pass `-uiTestResetOnboarding` so each launch
+        // starts from a clean first-run state regardless of persisted `@AppStorage`,
+        // keeping the Auth → onboarding → Root flow deterministic. No effect on
+        // normal launches (the arg is never set outside XCUITest).
+        if ProcessInfo.processInfo.arguments.contains("-uiTestResetOnboarding") {
+            UserDefaults.standard.set(false, forKey: "finmate.hasOnboarded")
+        }
     }
 
     var body: some Scene {

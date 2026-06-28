@@ -135,6 +135,7 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
                 .accessibilityLabel("Default display currency")
+                .accessibilityIdentifier("settings.currency")
             } header: {
                 Text("Currency")
             } footer: {
