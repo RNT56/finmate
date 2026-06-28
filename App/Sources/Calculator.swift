@@ -151,7 +151,7 @@ struct MoreView: View {
                 case .assets:     AssetsView()
                 case .calculator: CalculatorView()
                 case .importCSV:  ImportView()
-                case .settings:   SettingsStubView()
+                case .settings:   SettingsView()
                 }
             }
             .background(FinmateGradient())
@@ -161,18 +161,4 @@ struct MoreView: View {
 
 enum MoreDestination: Hashable {
     case assets, calculator, importCSV, settings
-}
-
-/// Settings placeholder (full settings/theming arrives in a later milestone, docs/08).
-struct SettingsStubView: View {
-    var body: some View {
-        ContentUnavailableView(
-            "Settings",
-            systemImage: "gearshape.fill",
-            description: Text("Theming, currency preferences, and account controls arrive in a later milestone (see docs/08).")
-        )
-        .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
-        .background(FinmateGradient())
-    }
 }

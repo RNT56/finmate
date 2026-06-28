@@ -32,6 +32,12 @@ const ITEMS: MoreItem[] = [
     title: 'Import CSV',
     subtitle: 'Preview and validate a subscriptions CSV before importing',
   },
+  {
+    to: '/settings',
+    icon: '⚙',
+    title: 'Settings',
+    subtitle: 'Appearance, default currency, reminders, privacy, and data',
+  },
 ];
 
 export function More() {
@@ -68,14 +74,6 @@ export function More() {
               </li>
             ))}
           </ul>
-        </GlassCard>
-
-        <GlassCard>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Settings</div>
-          <div className="fm-secondary" style={{ fontSize: 14 }}>
-            Appearance, currency, and account settings arrive in a later milestone
-            (docs/08). Light/dark already follow the system via the Liquid Glass tokens.
-          </div>
         </GlassCard>
       </div>
     </Page>
