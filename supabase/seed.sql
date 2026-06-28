@@ -1,0 +1,40 @@
+-- =============================================================================
+-- Finmate — local DEV seed (supabase/seed.sql)
+-- -----------------------------------------------------------------------------
+-- Applied automatically by `supabase db reset` AFTER all migrations run.
+--
+-- INTENTIONALLY A NO-OP for real data.
+--
+-- Finmate has NO global/shared seed data. Every row is user-owned and gated by
+-- RLS on auth.uid() = user_id, and the default category taxonomies + singleton
+-- preference rows are seeded PER USER by the `on_auth_user_created` trigger
+-- (handle_new_user -> seed_default_categories), defined in
+-- 20260628000900_new_user_bootstrap.sql. There is therefore nothing to seed at
+-- the database level.
+--
+-- Auth users are created via the app (Sign in with Apple / email+password) or,
+-- for local testing, via the CLI/Studio:
+--
+--   -- Create a local test user (DEV ONLY — never in production):
+--   --   supabase auth admin create-user test@example.com --password "Passw0rd!"
+--   -- or via Studio at http://127.0.0.1:54323 (Authentication -> Add user).
+--   -- The on_auth_user_created trigger then auto-seeds that user's categories
+--   -- and preferences, so the very first app launch already has chips.
+--
+-- Example (COMMENTED OUT) of inserting demo financial rows for an existing
+-- local user. Replace <USER_UUID> with a real auth.users.id and run manually.
+-- Money is Int64 minor units in the row's own currency (cents / satoshis);
+-- never store Double/Float and never pre-convert across currencies.
+--
+--   -- INSERT INTO public.subscriptions (user_id, name, amount_minor, currency, billing_period)
+--   -- VALUES ('<USER_UUID>', 'Netflix', 1299, 'EUR', 'monthly');   -- €12.99
+--   --
+--   -- INSERT INTO public.income_sources (user_id, name, amount_minor, currency, frequency)
+--   -- VALUES ('<USER_UUID>', 'Salary', 350000, 'EUR', 'monthly');  -- €3,500.00
+--   --
+--   -- INSERT INTO public.financial_assets (user_id, name, asset_type, currency, value_minor, quantity, purchase_price_minor, current_price_minor)
+--   -- VALUES ('<USER_UUID>', 'Bitcoin', 'crypto', 'BTC', 50000, 0.00050000, 40000, 100000000);
+--   --   value_minor = 50,000 sats total; current_price_minor = 100,000,000 sats per BTC.
+-- =============================================================================
+
+-- No-op: nothing to seed globally.
