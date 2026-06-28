@@ -38,37 +38,125 @@ public struct ImportPreview: Equatable, Sendable {
 
 public enum SubscriptionCSVImporter {
 
+    // MARK: Canonical fields (docs/13 §9.2)
+
+    /// The canonical, mappable target fields a CSV column can feed. `rawValue` is the
+    /// canonical snake_case key used throughout the importer (and in error `field`s).
+    public enum CSVField: String, CaseIterable, Hashable, Sendable {
+        case name
+        case amount
+        case currency
+        case billingPeriod = "billing_period"
+        case paymentMethod = "payment_method"
+        case category
+        case usageState = "usage_state"
+        case startDate = "start_date"
+        case vendorURL = "vendor_url"
+
+        /// A short, human-facing label for the column-mapping UI.
+        public var displayName: String {
+            switch self {
+            case .name:          return "Name"
+            case .amount:        return "Amount"
+            case .currency:      return "Currency"
+            case .billingPeriod: return "Billing period"
+            case .paymentMethod: return "Payment method"
+            case .category:      return "Category"
+            case .usageState:    return "Usage state"
+            case .startDate:     return "Start date"
+            case .vendorURL:     return "URL"
+            }
+        }
+
+        /// Required fields must resolve to a column (directly or by default semantics).
+        /// Only `name` + `amount` are required; everything else has a sane default.
+        public var isRequired: Bool { self == .name || self == .amount }
+    }
+
+    /// The result of inspecting a CSV header: the raw header tokens (as written) and
+    /// the auto-detected field → column-index mapping (alias match; missing fields
+    /// are simply absent). The UI seeds its per-field Pickers from `autoMapping` and
+    /// lets the user override before calling ``parse(_:mapping:)``.
+    public struct HeaderAnalysis: Equatable, Sendable {
+        /// Header tokens exactly as they appear in the file (trimmed of surrounding
+        /// whitespace), in column order.
+        public let headers: [String]
+        /// Auto-detected canonical-field → column-index mapping (alias-based).
+        public let autoMapping: [CSVField: Int]
+
+        public init(headers: [String], autoMapping: [CSVField: Int]) {
+            self.headers = headers
+            self.autoMapping = autoMapping
+        }
+    }
+
     // MARK: Header aliases (docs/13 §9.2). Canonical key ← {aliases}, case-insensitive.
 
-    private static let aliases: [String: Set<String>] = [
-        "name":           ["name", "service", "title", "subscription"],
-        "amount":         ["amount", "monthly_cost", "cost", "price", "monthly_amount"],
-        "currency":       ["currency", "ccy"],
-        "billing_period": ["billing_period", "period", "cycle", "billing"],
-        "payment_method": ["payment_method", "method", "payment"],
-        "category":       ["category"],
-        "usage_state":    ["usage_state", "usage", "status"],
-        "start_date":     ["start_date", "start", "since", "date"],
-        "vendor_url":     ["url", "vendor_url", "website"],
+    private static let aliases: [CSVField: Set<String>] = [
+        .name:          ["name", "service", "title", "subscription"],
+        .amount:        ["amount", "monthly_cost", "cost", "price", "monthly_amount"],
+        .currency:      ["currency", "ccy"],
+        .billingPeriod: ["billing_period", "period", "cycle", "billing"],
+        .paymentMethod: ["payment_method", "method", "payment"],
+        .category:      ["category"],
+        .usageState:    ["usage_state", "usage", "status"],
+        .startDate:     ["start_date", "start", "since", "date"],
+        .vendorURL:     ["url", "vendor_url", "website"],
     ]
 
-    // MARK: Public entry point
+    // MARK: Header analysis
+
+    /// Inspect a CSV's header row: return the raw tokens plus the auto-detected
+    /// field → column-index mapping (alias match). Empty if the text has no rows.
+    /// This is the read the column-mapping UI uses to seed its Pickers.
+    public static func analyzeHeader(_ text: String) -> HeaderAnalysis {
+        let rows = parseRecords(text)
+        guard let header = rows.first else {
+            return HeaderAnalysis(headers: [], autoMapping: [:])
+        }
+        let tokens = header.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return HeaderAnalysis(headers: tokens, autoMapping: autoDetectMapping(header))
+    }
+
+    /// Build the auto-detected field → column-index mapping for a header row. First
+    /// alias match wins per field; first column wins on duplicate aliases.
+    private static func autoDetectMapping(_ header: [String]) -> [CSVField: Int] {
+        var mapping: [CSVField: Int] = [:]
+        for (i, raw) in header.enumerated() {
+            let token = normalizeHeaderToken(raw)
+            for (field, set) in aliases where set.contains(token) {
+                if mapping[field] == nil { mapping[field] = i }
+            }
+        }
+        return mapping
+    }
+
+    // MARK: Public entry points
 
     /// Parse a CSV string into an `ImportPreview`. The header row is required and is
-    /// counted as row 1; data rows start at row 2.
+    /// counted as row 1; data rows start at row 2. Columns are mapped automatically
+    /// from the header aliases.
     public static func parseSubscriptionsCSV(_ text: String) -> ImportPreview {
         let rows = parseRecords(text)
         guard let header = rows.first else {
             return ImportPreview(valid: [], errors: [], totalRows: 0)
         }
+        return parse(rows, mapping: autoDetectMapping(header))
+    }
 
-        // Build canonical-column → field-index map from the header.
-        var columnIndex: [String: Int] = [:]
-        for (i, raw) in header.enumerated() {
-            let token = normalizeHeaderToken(raw)
-            for (canonical, set) in aliases where set.contains(token) {
-                if columnIndex[canonical] == nil { columnIndex[canonical] = i }
-            }
+    /// Parse a CSV string with an **explicit** field → column-index mapping (the UI's
+    /// user-overridable mapping). The header row is still consumed as row 1 — the
+    /// mapping refers to its column positions — and data rows start at row 2. Fields
+    /// absent from `mapping` fall back to their defaults exactly as with auto-detect.
+    public static func parse(_ text: String, mapping: [CSVField: Int]) -> ImportPreview {
+        parse(parseRecords(text), mapping: mapping)
+    }
+
+    /// Shared core: parse already-tokenized records (header at index 0) with an
+    /// explicit field → column-index mapping.
+    private static func parse(_ rows: [[String]], mapping: [CSVField: Int]) -> ImportPreview {
+        guard !rows.isEmpty else {
+            return ImportPreview(valid: [], errors: [], totalRows: 0)
         }
 
         let dataRows = Array(rows.dropFirst())
@@ -80,7 +168,7 @@ public enum SubscriptionCSVImporter {
             // Skip wholly-blank trailing rows (common when text ends with a newline).
             if fields.allSatisfy({ $0.trimmingCharacters(in: .whitespaces).isEmpty }) { continue }
 
-            switch buildRow(fields: fields, columnIndex: columnIndex, rowNumber: rowNumber) {
+            switch buildRow(fields: fields, columnIndex: mapping, rowNumber: rowNumber) {
             case .success(let sub):
                 valid.append(sub)
             case .failure(let rowErrors):
@@ -99,16 +187,16 @@ public enum SubscriptionCSVImporter {
         case failure([ImportRowError])
     }
 
-    private static func buildRow(fields: [String], columnIndex: [String: Int], rowNumber: Int) -> RowResult {
-        func value(_ key: String) -> String {
-            guard let idx = columnIndex[key], idx < fields.count else { return "" }
+    private static func buildRow(fields: [String], columnIndex: [CSVField: Int], rowNumber: Int) -> RowResult {
+        func value(_ key: CSVField) -> String {
+            guard let idx = columnIndex[key], idx >= 0, idx < fields.count else { return "" }
             return fields[idx].trimmingCharacters(in: .whitespaces)
         }
 
         var errors: [ImportRowError] = []
 
         // name — required, 1...120 chars
-        let name = value("name")
+        let name = value(.name)
         if name.isEmpty {
             errors.append(ImportRowError(row: rowNumber, field: "name", message: "Missing name"))
         } else if name.count > 120 {
@@ -116,7 +204,7 @@ public enum SubscriptionCSVImporter {
         }
 
         // currency — default EUR if blank, else must be one of the supported codes
-        let currencyRaw = value("currency")
+        let currencyRaw = value(.currency)
         var currency: CurrencyCode = .eur
         if !currencyRaw.isEmpty {
             if let c = CurrencyCode(rawValue: currencyRaw.uppercased()) {
@@ -127,7 +215,7 @@ public enum SubscriptionCSVImporter {
         }
 
         // amount — required, locale-aware, non-negative, within currency precision
-        let amountRaw = value("amount")
+        let amountRaw = value(.amount)
         var amountMinor: Int64 = 0
         if amountRaw.isEmpty {
             errors.append(ImportRowError(row: rowNumber, field: "amount", message: "Invalid amount"))
@@ -141,7 +229,7 @@ public enum SubscriptionCSVImporter {
 
         // billing_period — default monthly
         var billingPeriod: BillingPeriod = .monthly
-        let periodRaw = value("billing_period")
+        let periodRaw = value(.billingPeriod)
         if !periodRaw.isEmpty {
             if let p = BillingPeriod(rawValue: periodRaw.lowercased()) {
                 billingPeriod = p
@@ -152,7 +240,7 @@ public enum SubscriptionCSVImporter {
 
         // payment_method — default other
         var paymentMethod: PaymentMethod = .other
-        let methodRaw = value("payment_method")
+        let methodRaw = value(.paymentMethod)
         if !methodRaw.isEmpty {
             if let m = PaymentMethod(rawValue: methodRaw.lowercased()) {
                 paymentMethod = m
@@ -163,7 +251,7 @@ public enum SubscriptionCSVImporter {
 
         // usage_state — default active
         var usageState: UsageState = .active
-        let usageRaw = value("usage_state")
+        let usageRaw = value(.usageState)
         if !usageRaw.isEmpty {
             if let u = UsageState(rawValue: usageRaw.lowercased()) {
                 usageState = u
@@ -174,7 +262,7 @@ public enum SubscriptionCSVImporter {
 
         // start_date — default today, parsed yyyy-MM-dd
         var startDate = Date()
-        let dateRaw = value("start_date")
+        let dateRaw = value(.startDate)
         if !dateRaw.isEmpty {
             if let d = parseISODate(dateRaw) {
                 startDate = d
@@ -184,7 +272,7 @@ public enum SubscriptionCSVImporter {
         }
 
         // vendor_url — optional, no validation beyond emptiness
-        let vendorRaw = value("vendor_url")
+        let vendorRaw = value(.vendorURL)
         let vendorURL = vendorRaw.isEmpty ? nil : vendorRaw
 
         guard errors.isEmpty else { return .failure(errors) }

@@ -173,6 +173,62 @@ function isValidISODate(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
+/** The canonical, mappable target fields (mirrors the Swift `CSVField`). */
+export type CSVField =
+  | 'name'
+  | 'amount'
+  | 'currency'
+  | 'billing_period'
+  | 'payment_method'
+  | 'category'
+  | 'usage_state'
+  | 'start_date'
+  | 'vendor_url';
+
+export const CSV_FIELDS: readonly CSVField[] = [
+  'name',
+  'amount',
+  'currency',
+  'billing_period',
+  'payment_method',
+  'category',
+  'usage_state',
+  'start_date',
+  'vendor_url',
+];
+
+/** Mapping of a canonical field to the 0-based column index it reads from. */
+export type ColumnMapping = Partial<Record<CSVField, number>>;
+
+export interface HeaderAnalysis {
+  /** Raw header tokens (trimmed), in column order. */
+  headers: string[];
+  /** Auto-detected field -> column index (alias match; missing fields absent). */
+  autoMapping: ColumnMapping;
+}
+
+/** Build the alias-based auto-mapping for a (tokenized) header row. */
+function autoDetectMapping(header: string[]): ColumnMapping {
+  const mapping: ColumnMapping = {};
+  header.forEach((raw, idx) => {
+    const canonical = HEADER_ALIASES[snake(raw)] as CSVField | undefined;
+    if (canonical && mapping[canonical] === undefined) mapping[canonical] = idx;
+  });
+  return mapping;
+}
+
+/**
+ * Inspect a CSV's header: the raw tokens + the auto-detected field->column map.
+ * This is the read the column-mapping UI uses to seed its selectors.
+ */
+export function analyzeHeader(text: string): HeaderAnalysis {
+  const rows = tokenizeCSV(text);
+  const nonEmpty = rows.filter((r) => !(r.length === 1 && r[0].trim() === ''));
+  if (nonEmpty.length === 0) return { headers: [], autoMapping: {} };
+  const headers = nonEmpty[0].map((h) => h.trim());
+  return { headers, autoMapping: autoDetectMapping(nonEmpty[0]) };
+}
+
 /**
  * Parse a subscriptions CSV into a previewable `ImportPreview`. Collects ALL
  * errors per row (1-based, header excluded). A missing required column (`name`
@@ -187,11 +243,7 @@ export function parseSubscriptionsCSV(text: string): ImportPreview {
     return { valid: [], errors: [{ row: 0, message: 'Empty CSV.' }], totalRows: 0 };
   }
 
-  const header = nonEmpty[0].map((h) => HEADER_ALIASES[snake(h)] ?? snake(h));
-  const colIndex: Partial<Record<string, number>> = {};
-  header.forEach((canonical, idx) => {
-    if (!(canonical in colIndex)) colIndex[canonical] = idx;
-  });
+  const colIndex = autoDetectMapping(nonEmpty[0]);
 
   const dataRows = nonEmpty.slice(1);
   const totalRows = dataRows.length;
@@ -208,9 +260,37 @@ export function parseSubscriptionsCSV(text: string): ImportPreview {
     };
   }
 
-  const cell = (cols: string[], canonical: string): string => {
+  return buildPreview(dataRows, colIndex, totalRows);
+}
+
+/**
+ * Parse a CSV with an EXPLICIT field -> column-index mapping (the UI's
+ * user-overridable mapping). Mirrors the Swift `parse(_:mapping:)`: fields absent
+ * from the mapping fall back to their defaults, and there is no whole-file
+ * required-column gate (the caller enforces that name/amount are mapped).
+ */
+export function parseSubscriptionsCSVWithMapping(
+  text: string,
+  mapping: ColumnMapping
+): ImportPreview {
+  const rows = tokenizeCSV(text);
+  const nonEmpty = rows.filter((r) => !(r.length === 1 && r[0].trim() === ''));
+  if (nonEmpty.length === 0) {
+    return { valid: [], errors: [], totalRows: 0 };
+  }
+  const dataRows = nonEmpty.slice(1);
+  return buildPreview(dataRows, mapping, dataRows.length);
+}
+
+/** Shared per-row validation core used by both the auto and explicit paths. */
+function buildPreview(
+  dataRows: string[][],
+  colIndex: ColumnMapping,
+  totalRows: number
+): ImportPreview {
+  const cell = (cols: string[], canonical: CSVField): string => {
     const idx = colIndex[canonical];
-    if (idx === undefined) return '';
+    if (idx === undefined || idx < 0) return '';
     return (cols[idx] ?? '').trim();
   };
 
