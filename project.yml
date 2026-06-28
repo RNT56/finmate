@@ -47,3 +47,42 @@ targets:
         product: Shared
       - package: FinmateData
         product: DataLayer
+  # Store-layer unit tests — exercise the @Observable stores (load/mutate/error/
+  # reorder/currency-recompute) against the in-memory + throwing mock repos that
+  # live in the app module via `@testable import Finmate`.
+  FinmateAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: App/Tests
+    dependencies:
+      - target: Finmate
+      - package: FinmateCore
+        product: Domain
+      - package: FinmateData
+        product: DataLayer
+    settings:
+      base:
+        # Host the tests inside the app so `@testable import Finmate` resolves.
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Finmate.app/Finmate"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  Finmate:
+    build:
+      targets:
+        Finmate: all
+        FinmateAppTests: [test]
+    test:
+      gatherCoverageData: true
+      coverageTargets:
+        - Finmate
+      targets:
+        - FinmateAppTests
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

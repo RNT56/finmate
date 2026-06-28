@@ -1,6 +1,6 @@
 name: web
 
-# Web client CI (Vite + React 19 + TypeScript) — lint, build, test.
+# Web client CI (Vite + React 19 + TypeScript) — lint, build, test + coverage gate.
 # Scoped to the web/ subtree so iOS changes don't trigger it.
 on:
   push:
@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   build-test:
-    name: lint · build · test
+    name: lint · build · test · coverage
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -48,5 +48,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Test
-        run: npm test
+      # Runs the full Vitest suite (pure core + store/hook layer) AND enforces the
+      # coverage thresholds configured in vite.config.ts (conservative 70% floor on
+      # the measured logic layers). A real regression gate, set comfortably below the
+      # current ~83% so it is not flaky. Subsumes the plain `npm test` run.
+      - name: Test + coverage gate
+        run: npm run coverage
