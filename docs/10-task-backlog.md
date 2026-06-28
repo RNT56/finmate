@@ -184,10 +184,10 @@ This backlog's milestone numbering is **one-to-one** with the roadmap's "roadmap
 
 ### M1-TEST — Testing infrastructure (stood up here)
 
-- [ ] **M1-TEST-01** — Stand up **Swift Testing** targets for `Domain`, `DataLayer`, `Shared`; ensure they run via `swift test` and in CI. (dep: M0-CI-01)
+- [x] **M1-TEST-01** — Stand up **Swift Testing** targets for `Domain`, `DataLayer`, `Shared`; ensure they run via `swift test` and in CI. (dep: M0-CI-01) — *Domain + Shared Swift Testing run via `swift test` and in `ios.yml` (now with `--enable-code-coverage` + a coverage floor); a hosted `FinmateAppTests` target runs via `xcodebuild test` in CI. DataLayer integration tests await the live project.*
 - [ ] **M1-TEST-02** — Add **swift-snapshot-testing** to `DesignSystem`; snapshot the component gallery (M0-DS-04) in light + dark and at a small and an XXL Dynamic Type size. (dep: M0-DS-04)
-- [ ] **M1-TEST-03** — Add a **mock-repository test harness** so feature Stores can be tested without Supabase. (dep: M0-DATA-02)
-- [ ] **M1-TEST-04** — Author **store-level tests** for `SubscriptionsStore`: optimistic update + rollback, sort/filter, favorite toggle. (dep: M1-SUBS-04, M1-TEST-03)
+- [x] **M1-TEST-03** — Add a **mock-repository test harness** so feature Stores can be tested without Supabase. (dep: M0-DATA-02) — *the in-memory repos + hand-rolled throwing mocks (iOS `FinmateAppTests`; web hand-rolled mock repos) back the store/hook tests with no Supabase dependency.*
+- [x] **M1-TEST-04** — Author **store-level tests** for `SubscriptionsStore`: optimistic update + rollback, sort/filter, favorite toggle. (dep: M1-SUBS-04, M1-TEST-03) — *`SubscriptionsStoreTests` (+ `CashFlowStoreTests`/`AssetsStoreTests`) cover load (happy+empty), add, delete, reorder (persisted sortOrder), and error→`loadError`; the store does optimistic-then-reload (a throwing repo leaves state consistent). Field-level rollback + favorite toggle remain a follow-up.*
 
 ---
 
@@ -391,8 +391,8 @@ This backlog's milestone numbering is **one-to-one** with the roadmap's "roadmap
 ### M8-TEST — Test coverage & UI tests
 
 - [ ] **M8-TEST-01** — Author **XCUITest** flows for the critical paths: sign-in, add subscription, import CSV, view cash flow, run the BTC calculator. (dep: feature milestones)
-- [ ] **M8-TEST-02** — Raise unit-test coverage on all pure logic (money, currency, analytics, CSV, occurrence projection, Sankey) to the bar in [`./09-engineering-practices.md`](./09-engineering-practices.md).
-- [ ] **M8-TEST-03** — Add a CI coverage report + threshold gate.
+- [~] **M8-TEST-02** — Raise unit-test coverage on all pure logic (money, currency, analytics, CSV, occurrence projection, Sankey) to the bar in [`./09-engineering-practices.md`](./09-engineering-practices.md). — *pure logic is heavily covered (iOS Domain ~90.6% line coverage / 166 tests; web 82.97% / 261 tests) across money, currency/conversion, cash-flow + money-flow, CSV (all entity types), recurrence, assets, and the chart-a11y helpers; the store/hook layer is now covered too. Formal snapshot tests (M1-TEST-02) remain.*
+- [x] **M8-TEST-03** — Add a CI coverage report + threshold gate. — *iOS `ios.yml` runs Domain tests with `--enable-code-coverage` + a `llvm-cov` floor check, and an `xcodebuild test` step (`-enableCodeCoverage YES`) for `FinmateAppTests`; web `web.yml` runs `vitest --coverage` (@vitest/coverage-v8) gated at 70% lines/branches/funcs (actual 82.97%).*
 
 ### M8-STORE — App Store preparation
 
