@@ -15,6 +15,10 @@ settings:
     GENERATE_INFOPLIST_FILE: "YES"
     INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
     INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: "YES"
+    # App Store submission: standard HTTPS/Keychain crypto only — export-compliance exempt (docs/07 §9.2).
+    INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: "NO"
+    # Biometric app-lock toggle requires a Face ID usage description (docs/07 §9.2).
+    INFOPLIST_KEY_NSFaceIDUsageDescription: "Finmate uses Face ID to lock the app."
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1"

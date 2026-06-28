@@ -1,0 +1,77 @@
+# SwiftLint configuration for Finmate (iOS lead client).
+# Scoped to the app target and the local Swift packages. Opt-in rules stay
+# off by default; a few default rules are disabled where they would fight the
+# codebase or the project's deliberate style choices.
+
+included:
+  - App
+  - Packages
+
+excluded:
+  - .build
+  - .build-xcode
+  - Packages/FinmateCore/.build
+  - "**/.build"
+  - DerivedData
+  - web
+  - docs
+
+# Default rules we intentionally turn off.
+disabled_rules:
+  - todo                      # TODO/FIXME tracked in docs/10-task-backlog.md, not lint.
+  - trailing_comma            # Multiline literal trailing commas are fine.
+  - opening_brace             # Avoid churn against generated/SwiftUI styling.
+
+# A small, pragmatic set of opt-in rules (most opt-ins remain off).
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - first_where
+  - last_where
+  - contains_over_first_not_nil
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - toggle_bool
+  - unused_import
+
+line_length:
+  warning: 140
+  error: 200
+  ignores_comments: true
+  ignores_urls: true
+
+identifier_name:
+  min_length: 2
+  excluded:
+    - id
+    - x
+    - y
+    - to
+    - up
+
+type_name:
+  max_length:
+    warning: 50
+    error: 60
+
+function_body_length:
+  warning: 80
+  error: 150
+
+type_body_length:
+  warning: 350
+  error: 500
+
+file_length:
+  warning: 600
+  error: 1000
+  ignore_comment_only_lines: true
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+nesting:
+  type_level: 2
+
+reporter: "xcode"

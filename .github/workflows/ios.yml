@@ -1,0 +1,49 @@
+name: iOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & test (iOS)
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.app || true
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run Domain unit tests (FinmateCore)
+        run: swift test --package-path Packages/FinmateCore
+
+      - name: SwiftLint (non-blocking if not installed)
+        run: |
+          if command -v swiftlint >/dev/null 2>&1; then
+            swiftlint lint --strict || echo "::warning::SwiftLint reported issues"
+          else
+            echo "::notice::SwiftLint not installed on runner; skipping lint step"
+          fi
+
+      - name: Build app for iPhone 17 simulator
+        run: |
+          xcodebuild \
+            -project Finmate.xcodeproj \
+            -scheme Finmate \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            build
