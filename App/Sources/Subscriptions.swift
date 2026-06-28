@@ -149,8 +149,9 @@ struct SubscriptionRow: View {
         GlassCard {
             HStack(spacing: 14) {
                 Image(systemName: subscription.icon ?? "creditcard.fill")
-                    .font(.title2).frame(width: 34)
+                    .font(.title2).frame(minWidth: 34)
                     .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(subscription.name).font(.headline)
                     Text("\(subscription.billingPeriod.rawValue.capitalized) · \(subscription.usageState.rawValue.capitalized)")
@@ -164,6 +165,8 @@ struct SubscriptionRow: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(subscription.name), \(subscription.monthlyAmount.formatted()) per month, \(subscription.billingPeriod.rawValue), \(subscription.usageState.rawValue)")
     }
 }
 

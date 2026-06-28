@@ -9,6 +9,7 @@ import { More } from './features/more/More';
 import { Assets } from './features/assets/Assets';
 import { Calculator } from './features/calculator/Calculator';
 import { Import } from './features/import/Import';
+import { Settings } from './features/settings/Settings';
 
 const router = createBrowserRouter([
   {
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
       { path: 'assets', element: <Assets /> },
       { path: 'calculator', element: <Calculator /> },
       { path: 'import', element: <Import /> },
+      { path: 'settings', element: <Settings /> },
       { path: '*', element: <Placeholder title="Not found" /> },
     ],
   },

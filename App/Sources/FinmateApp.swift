@@ -3,9 +3,16 @@ import Domain
 
 @main
 struct FinmateApp: App {
+    /// App-root preferences store (M7). Owns appearance + display-currency +
+    /// reminder/biometric prefs and drives `.preferredColorScheme` app-wide.
+    @State private var preferencesStore = PreferencesStore()
+
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environment(preferencesStore)
+                .preferredColorScheme(preferencesStore.appearance.preferredColorScheme)
+                .task { await preferencesStore.load() }
         }
     }
 }
@@ -48,9 +55,11 @@ struct HomeView: View {
                                 .font(.subheadline).foregroundStyle(.secondary)
                             Text(monthlyEUR.formatted())
                                 .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                                .minimumScaleFactor(0.6)
                                 .contentTransition(.numericText())
                         }
                     }
+                    .accessibilityElement(children: .combine)
                     GlassCard {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Active services")
@@ -59,6 +68,7 @@ struct HomeView: View {
                                 .font(.system(.largeTitle, design: .rounded).weight(.bold))
                         }
                     }
+                    .accessibilityElement(children: .combine)
                 }
                 .padding()
             }
