@@ -88,4 +88,16 @@ export class SupabaseAssetsRepository implements AssetsRepository {
     if (error) throw error;
     return (data ?? []).map(assetFromRow);
   }
+
+  async upsert(asset: FinancialAsset): Promise<void> {
+    const { error } = await this.client
+      .from('financial_assets')
+      .upsert(assetToRow(asset), { onConflict: 'id' });
+    if (error) throw error;
+  }
+
+  async remove(id: string): Promise<void> {
+    const { error } = await this.client.from('financial_assets').delete().eq('id', id);
+    if (error) throw error;
+  }
 }

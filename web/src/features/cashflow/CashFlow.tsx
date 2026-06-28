@@ -2,28 +2,55 @@
 // Savings rate %), an income-vs-expenses bar, and an expense breakdown list.
 // All figures come from the core/cashflow algorithms (docs/13 §6); one glass language.
 
+import { useState } from 'react';
 import { GlassCard } from '../../components/GlassCard';
 import { Page } from '../../components/AppShell';
 import { formatMoney } from '../../core/money';
 import { useCashFlow } from './useCashFlow';
 import { MoneyFlow } from './MoneyFlow';
+import { EntityModal } from './EntityModal';
+import { fixedMonthlyAmountMinor } from './types';
+import type { FixedExpense, IncomeSource, VariableExpense } from './types';
+import type { EntityKind } from './entityForm';
 
 const EUR_LOCALE = 'de-DE';
+
+type Entity = IncomeSource | FixedExpense | VariableExpense;
+type ModalState = { kind: EntityKind; existing: Entity | null } | null;
 
 export function CashFlow() {
   const {
     loading,
     metrics,
+    incomes,
+    fixedExpenses,
+    variableExpenses,
     fixedMinor,
     variableMinor,
     subscriptionsMinor,
     breakdown,
     displayCurrency,
+    addIncome,
+    removeIncome,
+    addFixed,
+    removeFixed,
+    addVariable,
+    removeVariable,
   } = useCashFlow();
+
+  const [modal, setModal] = useState<ModalState>(null);
 
   const fmt = (minor: number) => formatMoney(minor, displayCurrency, EUR_LOCALE);
   const savingsPct = (metrics.savingsRate * 100).toFixed(1);
   const netPositive = metrics.netMinor >= 0;
+
+  const saveEntity = async (entity: Entity) => {
+    if (!modal) return;
+    if (modal.kind === 'income') await addIncome(entity as IncomeSource);
+    else if (modal.kind === 'fixed') await addFixed(entity as FixedExpense);
+    else await addVariable(entity as VariableExpense);
+    setModal(null);
+  };
 
   return (
     <Page title="Cash Flow">
@@ -118,8 +145,155 @@ export function CashFlow() {
             {fmt(variableMinor)}
           </div>
         </GlassCard>
+
+        <EntitySection
+          title="Income sources"
+          addLabel="+ Add income"
+          onAdd={() => setModal({ kind: 'income', existing: null })}
+          rows={incomes.map((i) => ({
+            id: i.id,
+            primary: i.name,
+            secondary: i.frequency,
+            amount: fmt(i.amountMinor),
+            entity: i,
+          }))}
+          emptyLabel="No income sources yet."
+          onEdit={(e) => setModal({ kind: 'income', existing: e })}
+          onDelete={removeIncome}
+        />
+
+        <EntitySection
+          title="Fixed expenses"
+          addLabel="+ Add fixed"
+          onAdd={() => setModal({ kind: 'fixed', existing: null })}
+          rows={fixedExpenses.map((e) => ({
+            id: e.id,
+            primary: e.name,
+            secondary: `${e.categoryName} · ${e.billingPeriod} · ${fmt(fixedMonthlyAmountMinor(e))}/mo`,
+            amount: fmt(e.amountMinor),
+            entity: e,
+          }))}
+          emptyLabel="No fixed expenses yet."
+          onEdit={(e) => setModal({ kind: 'fixed', existing: e })}
+          onDelete={removeFixed}
+        />
+
+        <EntitySection
+          title="Variable expenses (this month)"
+          addLabel="+ Add variable"
+          onAdd={() => setModal({ kind: 'variable', existing: null })}
+          rows={variableExpenses.map((e) => ({
+            id: e.id,
+            primary: e.name,
+            secondary: `${e.categoryName} · ${e.spentOn}`,
+            amount: fmt(e.amountMinor),
+            entity: e,
+          }))}
+          emptyLabel="No variable expenses yet."
+          onEdit={(e) => setModal({ kind: 'variable', existing: e })}
+          onDelete={removeVariable}
+        />
       </div>
+
+      {modal && (
+        <EntityModal
+          kind={modal.kind}
+          existing={modal.existing}
+          onClose={() => setModal(null)}
+          onSave={saveEntity}
+        />
+      )}
     </Page>
+  );
+}
+
+interface SectionRow {
+  id: string;
+  primary: string;
+  secondary: string;
+  amount: string;
+  entity: Entity;
+}
+
+function EntitySection({
+  title,
+  addLabel,
+  onAdd,
+  rows,
+  emptyLabel,
+  onEdit,
+  onDelete,
+}: {
+  title: string;
+  addLabel: string;
+  onAdd: () => void;
+  rows: SectionRow[];
+  emptyLabel: string;
+  onEdit: (entity: Entity) => void;
+  onDelete: (id: string) => void | Promise<void>;
+}) {
+  return (
+    <GlassCard>
+      <div
+        className="fm-row"
+        style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}
+      >
+        <span className="fm-secondary" style={{ fontWeight: 600, fontSize: 14 }}>
+          {title}
+        </span>
+        <button type="button" className="fm-btn" style={{ padding: '6px 12px', fontSize: 13 }} onClick={onAdd}>
+          {addLabel}
+        </button>
+      </div>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {rows.map((row) => (
+          <li
+            key={row.id}
+            className="fm-row"
+            style={{
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 0',
+              borderTop: '1px solid var(--fm-glass-border)',
+            }}
+          >
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontWeight: 600, display: 'block' }}>{row.primary}</span>
+              <span className="fm-secondary" style={{ fontSize: 13 }}>
+                {row.secondary}
+              </span>
+            </span>
+            <span className="fm-amount">{row.amount}</span>
+            <span className="fm-row" style={{ gap: 6 }}>
+              <button
+                type="button"
+                className="fm-btn fm-btn-ghost"
+                style={{ padding: '6px 10px', fontSize: 13 }}
+                aria-label={`Edit ${row.primary}`}
+                onClick={() => onEdit(row.entity)}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="fm-btn fm-btn-ghost"
+                style={{ padding: '6px 10px', fontSize: 13 }}
+                aria-label={`Delete ${row.primary}`}
+                onClick={() => void onDelete(row.id)}
+              >
+                Delete
+              </button>
+            </span>
+          </li>
+        ))}
+        {rows.length === 0 && (
+          <li className="fm-secondary" style={{ padding: '8px 0' }}>
+            {emptyLabel}
+          </li>
+        )}
+      </ul>
+    </GlassCard>
   );
 }
 

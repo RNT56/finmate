@@ -97,6 +97,51 @@ final class CashFlowStore {
         variableExpenses = (try? await expenseRepository.variable()) ?? []
     }
 
+    // MARK: Income mutations — call the repo, then reload (KPIs + flow recompute).
+
+    func addIncome(_ income: IncomeSource) async {
+        try? await incomeRepository.upsert(income)
+        await load()
+    }
+    func updateIncome(_ income: IncomeSource) async {
+        try? await incomeRepository.upsert(income)
+        await load()
+    }
+    func deleteIncome(id: UUID) async {
+        try? await incomeRepository.delete(id: id)
+        await load()
+    }
+
+    // MARK: Fixed-expense mutations
+
+    func addFixed(_ expense: FixedExpense) async {
+        try? await expenseRepository.upsertFixed(expense)
+        await load()
+    }
+    func updateFixed(_ expense: FixedExpense) async {
+        try? await expenseRepository.upsertFixed(expense)
+        await load()
+    }
+    func deleteFixed(id: UUID) async {
+        try? await expenseRepository.deleteFixed(id: id)
+        await load()
+    }
+
+    // MARK: Variable-expense mutations
+
+    func addVariable(_ expense: VariableExpense) async {
+        try? await expenseRepository.upsertVariable(expense)
+        await load()
+    }
+    func updateVariable(_ expense: VariableExpense) async {
+        try? await expenseRepository.upsertVariable(expense)
+        await load()
+    }
+    func deleteVariable(id: UUID) async {
+        try? await expenseRepository.deleteVariable(id: id)
+        await load()
+    }
+
     /// The signed cash-flow metrics for the current month (docs/13 §6).
     var metrics: CashFlowMetrics {
         CashFlow.metrics(income: income, fixed: fixedExpenses, variable: variableExpenses,
@@ -150,6 +195,13 @@ struct CashFlowView: View {
     )
     @State private var didBind = false
 
+    @State private var editingIncome: IncomeSource?
+    @State private var addingIncome = false
+    @State private var editingFixed: FixedExpense?
+    @State private var addingFixed = false
+    @State private var editingVariable: VariableExpense?
+    @State private var addingVariable = false
+
     private let palette: [Color] = [.blue, .purple, .pink, .orange, .teal, .green, .indigo, .mint]
     private func color(for index: Int) -> Color { palette[index % palette.count] }
 
@@ -161,11 +213,32 @@ struct CashFlowView: View {
                     kpiGrid
                     incomeVsExpensesCard
                     if !store.expenseSlices.isEmpty { expenseBreakdownCard }
+                    incomeSection
+                    fixedSection
+                    variableSection
                 }
                 .padding()
             }
             .navigationTitle("Cash Flow")
             .background(FinmateGradient())
+            .sheet(isPresented: $addingIncome) {
+                IncomeFormView(income: nil) { saved in Task { await store.addIncome(saved) } }
+            }
+            .sheet(item: $editingIncome) { item in
+                IncomeFormView(income: item) { saved in Task { await store.updateIncome(saved) } }
+            }
+            .sheet(isPresented: $addingFixed) {
+                FixedExpenseFormView(expense: nil) { saved in Task { await store.addFixed(saved) } }
+            }
+            .sheet(item: $editingFixed) { item in
+                FixedExpenseFormView(expense: item) { saved in Task { await store.updateFixed(saved) } }
+            }
+            .sheet(isPresented: $addingVariable) {
+                VariableExpenseFormView(expense: nil) { saved in Task { await store.addVariable(saved) } }
+            }
+            .sheet(item: $editingVariable) { item in
+                VariableExpenseFormView(expense: item) { saved in Task { await store.updateVariable(saved) } }
+            }
             .task {
                 if !didBind {
                     // Subscriptions feed the expense roll-up; fetch them from the
@@ -278,6 +351,133 @@ struct CashFlowView: View {
             }
         }
     }
+
+    // MARK: Editable Income section
+
+    private var incomeSection: some View {
+        editableSection(
+            title: "Income",
+            symbol: "arrow.down.circle.fill",
+            tint: .green,
+            add: { addingIncome = true },
+            addLabel: "Add income"
+        ) {
+            if store.income.isEmpty {
+                emptyRow("No income sources yet.")
+            } else {
+                ForEach(store.income) { item in
+                    flowEntryRow(
+                        name: item.name,
+                        detail: item.frequency.rawValue.capitalized,
+                        amount: Money(minorUnits: item.amountMinor, currency: item.currency).formatted(),
+                        edit: { editingIncome = item },
+                        delete: { Task { await store.deleteIncome(id: item.id) } }
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: Editable Fixed-expense section
+
+    private var fixedSection: some View {
+        editableSection(
+            title: "Fixed expenses",
+            symbol: "calendar.badge.clock",
+            tint: .red,
+            add: { addingFixed = true },
+            addLabel: "Add fixed expense"
+        ) {
+            if store.fixedExpenses.isEmpty {
+                emptyRow("No fixed expenses yet.")
+            } else {
+                ForEach(store.fixedExpenses) { item in
+                    flowEntryRow(
+                        name: item.name,
+                        detail: "\(item.category ?? "Other") · \(item.frequency.rawValue.capitalized)",
+                        amount: Money(minorUnits: item.amountMinor, currency: item.currency).formatted(),
+                        edit: { editingFixed = item },
+                        delete: { Task { await store.deleteFixed(id: item.id) } }
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: Editable Variable-expense section
+
+    private var variableSection: some View {
+        editableSection(
+            title: "Variable expenses",
+            symbol: "cart.fill",
+            tint: .orange,
+            add: { addingVariable = true },
+            addLabel: "Add variable expense"
+        ) {
+            if store.variableExpenses.isEmpty {
+                emptyRow("No variable expenses yet.")
+            } else {
+                ForEach(store.variableExpenses) { item in
+                    flowEntryRow(
+                        name: item.name,
+                        detail: "\(item.category ?? "Other") · \(item.date.formatted(date: .abbreviated, time: .omitted))",
+                        amount: Money(minorUnits: item.amountMinor, currency: item.currency).formatted(),
+                        edit: { editingVariable = item },
+                        delete: { Task { await store.deleteVariable(id: item.id) } }
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: Section building blocks (shared layout for the three editable lists)
+
+    private func editableSection<Content: View>(
+        title: String, symbol: String, tint: Color,
+        add: @escaping () -> Void, addLabel: String,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: symbol).foregroundStyle(tint)
+                    Text(title).font(.headline)
+                    Spacer()
+                    Button(action: add) { Image(systemName: "plus.circle.fill") }
+                        .accessibilityLabel(addLabel)
+                }
+                content()
+            }
+        }
+    }
+
+    private func emptyRow(_ text: String) -> some View {
+        Text(text).font(.subheadline).foregroundStyle(.secondary)
+    }
+
+    private func flowEntryRow(
+        name: String, detail: String, amount: String,
+        edit: @escaping () -> Void, delete: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.subheadline.weight(.medium))
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(amount).font(.subheadline.monospacedDigit())
+            Button(action: delete) {
+                Image(systemName: "trash").foregroundStyle(.red)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Delete \(name)")
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: edit)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(name), \(detail), \(amount)")
+        .accessibilityHint("Tap to edit")
+    }
 }
 
 /// A Liquid Glass KPI tile.
@@ -302,5 +502,247 @@ struct KPICard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+// MARK: - Forms (add/edit) — docs/02 §5. Each is a Form with name + amount
+// (parsed via Money.parse with validation), currency, and frequency/date pickers.
+
+/// A reusable currency picker (EUR/USD/BTC) for the cash-flow forms.
+private struct CurrencyPickerRow: View {
+    @Binding var currency: CurrencyCode
+    var body: some View {
+        Picker("Currency", selection: $currency) {
+            ForEach(CurrencyCode.allCases, id: \.self) { code in
+                Text("\(code.symbol) \(code.rawValue)").tag(code)
+            }
+        }
+    }
+}
+
+/// Parse a major-unit decimal string into minor units for `currency`, or set an error.
+private func parsedMinor(_ raw: String, currency: CurrencyCode, error: inout String?) -> Int64? {
+    let trimmed = raw.trimmingCharacters(in: .whitespaces)
+    do {
+        let minor = try Money.parse(trimmed, currency: currency).minorUnits
+        error = nil
+        return minor
+    } catch {
+        return nil
+    }
+}
+
+struct IncomeFormView: View {
+    let income: IncomeSource?
+    var onSave: (IncomeSource) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name: String
+    @State private var amount: String
+    @State private var currency: CurrencyCode
+    @State private var frequency: IncomeFrequency
+    @State private var nextPayment: Date
+    @State private var amountError: String?
+
+    init(income: IncomeSource?, onSave: @escaping (IncomeSource) -> Void) {
+        self.income = income
+        self.onSave = onSave
+        _name = State(initialValue: income?.name ?? "")
+        let cur = income?.currency ?? .eur
+        _currency = State(initialValue: cur)
+        _amount = State(initialValue: income.map {
+            Money(minorUnits: $0.amountMinor, currency: $0.currency).decimalValue.description
+        } ?? "")
+        _frequency = State(initialValue: income?.frequency ?? .monthly)
+        _nextPayment = State(initialValue: income?.nextPayment ?? .now)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Source") {
+                    TextField("Name (e.g. Salary)", text: $name)
+                }
+                Section("Amount") {
+                    TextField("Amount", text: $amount).keyboardType(.decimalPad)
+                    CurrencyPickerRow(currency: $currency)
+                    if let amountError {
+                        Text(amountError).font(.caption).foregroundStyle(.red)
+                    }
+                }
+                Section("Schedule") {
+                    Picker("Frequency", selection: $frequency) {
+                        ForEach(IncomeFrequency.allCases, id: \.self) { f in
+                            Text(f.rawValue.capitalized).tag(f)
+                        }
+                    }
+                    DatePicker("Next payment", selection: $nextPayment, displayedComponents: .date)
+                }
+            }
+            .navigationTitle(income == nil ? "Add Income" : "Edit Income")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save).disabled(name.isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        guard let minor = parsedMinor(amount, currency: currency, error: &amountError) else {
+            amountError = "Enter a valid amount (max \(currency.minorUnitDigits) decimals)."
+            return
+        }
+        onSave(IncomeSource(
+            id: income?.id ?? UUID(), name: name, amountMinor: minor, currency: currency,
+            frequency: frequency, nextPayment: nextPayment, notes: income?.notes))
+        dismiss()
+    }
+}
+
+struct FixedExpenseFormView: View {
+    let expense: FixedExpense?
+    var onSave: (FixedExpense) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name: String
+    @State private var amount: String
+    @State private var currency: CurrencyCode
+    @State private var category: String
+    @State private var frequency: BillingPeriod
+    @State private var dueDate: Date
+    @State private var autopay: Bool
+    @State private var amountError: String?
+
+    init(expense: FixedExpense?, onSave: @escaping (FixedExpense) -> Void) {
+        self.expense = expense
+        self.onSave = onSave
+        _name = State(initialValue: expense?.name ?? "")
+        let cur = expense?.currency ?? .eur
+        _currency = State(initialValue: cur)
+        _amount = State(initialValue: expense.map {
+            Money(minorUnits: $0.amountMinor, currency: $0.currency).decimalValue.description
+        } ?? "")
+        _category = State(initialValue: expense?.category ?? "")
+        _frequency = State(initialValue: expense?.frequency ?? .monthly)
+        _dueDate = State(initialValue: expense?.dueDate ?? .now)
+        _autopay = State(initialValue: expense?.autopay ?? false)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Expense") {
+                    TextField("Name (e.g. Rent)", text: $name)
+                    TextField("Category (e.g. Housing)", text: $category)
+                }
+                Section("Amount") {
+                    TextField("Amount", text: $amount).keyboardType(.decimalPad)
+                    CurrencyPickerRow(currency: $currency)
+                    if let amountError {
+                        Text(amountError).font(.caption).foregroundStyle(.red)
+                    }
+                }
+                Section("Schedule") {
+                    Picker("Frequency", selection: $frequency) {
+                        ForEach(BillingPeriod.allCases, id: \.self) { f in
+                            Text(f.rawValue.capitalized).tag(f)
+                        }
+                    }
+                    DatePicker("Due date", selection: $dueDate, displayedComponents: .date)
+                    Toggle("Autopay", isOn: $autopay)
+                }
+            }
+            .navigationTitle(expense == nil ? "Add Fixed Expense" : "Edit Fixed Expense")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save).disabled(name.isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        guard let minor = parsedMinor(amount, currency: currency, error: &amountError) else {
+            amountError = "Enter a valid amount (max \(currency.minorUnitDigits) decimals)."
+            return
+        }
+        let trimmedCategory = category.trimmingCharacters(in: .whitespaces)
+        onSave(FixedExpense(
+            id: expense?.id ?? UUID(), name: name, amountMinor: minor, currency: currency,
+            category: trimmedCategory.isEmpty ? nil : trimmedCategory, frequency: frequency,
+            dueDate: dueDate, autopay: autopay, notes: expense?.notes))
+        dismiss()
+    }
+}
+
+struct VariableExpenseFormView: View {
+    let expense: VariableExpense?
+    var onSave: (VariableExpense) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name: String
+    @State private var amount: String
+    @State private var currency: CurrencyCode
+    @State private var category: String
+    @State private var date: Date
+    @State private var amountError: String?
+
+    init(expense: VariableExpense?, onSave: @escaping (VariableExpense) -> Void) {
+        self.expense = expense
+        self.onSave = onSave
+        _name = State(initialValue: expense?.name ?? "")
+        let cur = expense?.currency ?? .eur
+        _currency = State(initialValue: cur)
+        _amount = State(initialValue: expense.map {
+            Money(minorUnits: $0.amountMinor, currency: $0.currency).decimalValue.description
+        } ?? "")
+        _category = State(initialValue: expense?.category ?? "")
+        _date = State(initialValue: expense?.date ?? .now)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Expense") {
+                    TextField("Name (e.g. Groceries)", text: $name)
+                    TextField("Category (e.g. Food)", text: $category)
+                }
+                Section("Amount") {
+                    TextField("Amount", text: $amount).keyboardType(.decimalPad)
+                    CurrencyPickerRow(currency: $currency)
+                    if let amountError {
+                        Text(amountError).font(.caption).foregroundStyle(.red)
+                    }
+                }
+                Section("Date") {
+                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                }
+            }
+            .navigationTitle(expense == nil ? "Add Variable Expense" : "Edit Variable Expense")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save).disabled(name.isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        guard let minor = parsedMinor(amount, currency: currency, error: &amountError) else {
+            amountError = "Enter a valid amount (max \(currency.minorUnitDigits) decimals)."
+            return
+        }
+        let trimmedCategory = category.trimmingCharacters(in: .whitespaces)
+        onSave(VariableExpense(
+            id: expense?.id ?? UUID(), name: name, amountMinor: minor, currency: currency,
+            category: trimmedCategory.isEmpty ? nil : trimmedCategory, date: date, notes: expense?.notes))
+        dismiss()
     }
 }

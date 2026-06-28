@@ -158,4 +158,9 @@ public struct SupabaseAssetRepository: AssetRepository {
         let client = await provider.client()
         try await client.from("financial_assets").delete().eq("id", value: id.uuidString).execute()
     }
+
+    public func recordTransaction(_ transaction: AssetTransaction) async throws {
+        let client = await provider.client()
+        try await client.from("asset_transactions").upsert(AssetTransactionDTO(transaction)).execute()
+    }
 }

@@ -47,4 +47,13 @@ export interface CashFlowRepository {
   incomes(): Promise<IncomeSource[]>;
   fixedExpenses(): Promise<FixedExpense[]>;
   variableExpenses(): Promise<VariableExpense[]>;
+
+  upsertIncome(income: IncomeSource): Promise<void>;
+  deleteIncome(id: string): Promise<void>;
+
+  upsertFixed(expense: FixedExpense): Promise<void>;
+  deleteFixed(id: string): Promise<void>;
+
+  upsertVariable(expense: VariableExpense): Promise<void>;
+  deleteVariable(id: string): Promise<void>;
 }

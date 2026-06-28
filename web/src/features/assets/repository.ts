@@ -47,13 +47,27 @@ export const sampleAssets: FinancialAsset[] = [
 /** Repository protocol — the store calls this, never the SDK directly (docs/03). */
 export interface AssetsRepository {
   all(): Promise<FinancialAsset[]>;
+  upsert(asset: FinancialAsset): Promise<void>;
+  remove(id: string): Promise<void>;
 }
 
 export class InMemoryAssetsRepository implements AssetsRepository {
-  constructor(private readonly seed: FinancialAsset[] = sampleAssets) {}
+  private store: Map<string, FinancialAsset>;
+
+  constructor(seed: FinancialAsset[] = sampleAssets) {
+    this.store = new Map(seed.map((a) => [a.id, { ...a }]));
+  }
 
   async all(): Promise<FinancialAsset[]> {
-    return this.seed.map((a) => ({ ...a }));
+    return [...this.store.values()].map((a) => ({ ...a }));
+  }
+
+  async upsert(asset: FinancialAsset): Promise<void> {
+    this.store.set(asset.id, { ...asset });
+  }
+
+  async remove(id: string): Promise<void> {
+    this.store.delete(id);
   }
 }
 
