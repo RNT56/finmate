@@ -7,7 +7,11 @@ import {
   parseSubscriptionsCSV,
   parseSubscriptionsCSVWithMapping,
   analyzeHeader,
+  dedupeKey,
+  detectDuplicates,
+  existingKeySet,
   type ColumnMapping,
+  type DedupeCandidate,
 } from './csvImport';
 
 describe('tokenizeCSV (RFC-4180-lite)', () => {
@@ -212,5 +216,81 @@ describe('analyzeHeader + explicit mapping', () => {
     expect(explicit.valid[0].name).toBe('Spotify'); // from col 2
     expect(explicit.valid[0].amountMinor).toBe(850);
     expect(explicit.valid[0].currency).toBe('EUR'); // unmapped -> default
+  });
+});
+
+// ===========================================================================
+// Duplicate detection — SAME fixtures/vectors as the Swift suite (M6 follow-up).
+// Key = name|amountMinor|currency, name lowercased+trimmed (whitespace collapsed),
+// currency uppercased. Within-CSV repeats + matches against an existing-key set.
+// ===========================================================================
+
+describe('dedupeKey — normalized name|amountMinor|currency', () => {
+  it('lowercases + trims + collapses whitespace in the name and uppercases currency', () => {
+    expect(dedupeKey('  Netflix  ', 1299, 'EUR')).toBe('netflix|1299|EUR');
+    expect(dedupeKey('NETFLIX', 1299, 'eur' as never)).toBe('netflix|1299|EUR');
+    expect(dedupeKey('Spotify  Premium', 999, 'USD')).toBe('spotify premium|999|USD');
+  });
+
+  it('distinguishes amount and currency', () => {
+    expect(dedupeKey('Netflix', 1299, 'EUR')).not.toBe(dedupeKey('Netflix', 1300, 'EUR'));
+    expect(dedupeKey('Netflix', 1299, 'EUR')).not.toBe(dedupeKey('Netflix', 1299, 'USD'));
+  });
+});
+
+describe('detectDuplicates — within-CSV repeats', () => {
+  const rows: DedupeCandidate[] = [
+    { name: 'Netflix', amountMinor: 1299, currency: 'EUR' }, // 0 — first, not flagged
+    { name: 'Spotify', amountMinor: 999, currency: 'EUR' }, // 1 — unique
+    { name: 'netflix', amountMinor: 1299, currency: 'EUR' }, // 2 — repeat of row 0 (case-insensitive)
+    { name: 'Netflix', amountMinor: 1299, currency: 'USD' }, // 3 — different currency, NOT a dup
+  ];
+
+  it('flags only the LATER repeat, keeping the first occurrence importable', () => {
+    const report = detectDuplicates(rows);
+    expect(report.count).toBe(1);
+    expect(report.flaggedIndices.has(2)).toBe(true);
+    expect(report.flaggedIndices.has(0)).toBe(false);
+    expect(report.flags[0]).toEqual({ index: 2, key: 'netflix|1299|EUR', reason: 'within-csv' });
+  });
+
+  it('does not flag rows that differ in currency or amount', () => {
+    const report = detectDuplicates(rows);
+    expect(report.flaggedIndices.has(1)).toBe(false);
+    expect(report.flaggedIndices.has(3)).toBe(false);
+  });
+});
+
+describe('detectDuplicates — against existing entity keys', () => {
+  const existing = existingKeySet([
+    { name: 'Netflix', amountMinor: 1299, currency: 'EUR' },
+    { name: 'GitHub', amountMinor: 10000, currency: 'USD' },
+  ]);
+
+  const rows: DedupeCandidate[] = [
+    { name: 'Netflix', amountMinor: 1299, currency: 'EUR' }, // 0 — matches existing
+    { name: 'Spotify', amountMinor: 999, currency: 'EUR' }, // 1 — new
+    { name: 'Netflix', amountMinor: 1299, currency: 'EUR' }, // 2 — matches existing AND row 0 → both
+  ];
+
+  it('flags rows whose key matches an existing entity', () => {
+    const report = detectDuplicates(rows, existing);
+    expect(report.flaggedIndices.has(0)).toBe(true);
+    expect(report.flags.find((f) => f.index === 0)?.reason).toBe('existing');
+  });
+
+  it('marks a row matching both an existing entity and an earlier row as "both"', () => {
+    const report = detectDuplicates(rows, existing);
+    expect(report.flags.find((f) => f.index === 2)?.reason).toBe('both');
+  });
+
+  it('leaves genuinely new rows unflagged', () => {
+    const report = detectDuplicates(rows, existing);
+    expect(report.flaggedIndices.has(1)).toBe(false);
+    expect(report.count).toBe(2);
+  });
+
+  it('with an empty existing set, behaves like within-CSV only', () => {
+    expect(detectDuplicates(rows).count).toBe(1); // only row 2 repeats row 0
   });
 });
