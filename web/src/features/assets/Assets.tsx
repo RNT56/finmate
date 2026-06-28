@@ -5,8 +5,13 @@
 
 import { useState } from 'react';
 import { GlassCard } from '../../components/GlassCard';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorCard } from '../../components/ErrorCard';
+import { SkeletonList } from '../../components/Skeleton';
+import { ChartDataTable } from '../../components/ChartDataTable';
 import { Page } from '../../components/AppShell';
 import { formatMoney } from '../../core/money';
+import { describeAllocation } from '../../core/chartDescription';
 import type { CurrencyCode } from '../../core/currency';
 import {
   type AssetSlice,
@@ -35,6 +40,8 @@ export function Assets() {
   const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('EUR');
   const {
     loading,
+    error,
+    reload,
     assets,
     totalValueMinor,
     totalGainMinor,
@@ -46,11 +53,59 @@ export function Assets() {
   } = useAssets(displayCurrency);
 
   // null = closed; { existing: null } = add; { existing: asset } = edit.
-  const [assetModal, setAssetModal] = useState<{ existing: FinancialAsset | null } | null>(null);
+  const [assetModal, setAssetModal] = useState<{
+    existing: FinancialAsset | null;
+  } | null>(null);
   const [txnAsset, setTxnAsset] = useState<FinancialAsset | null>(null);
 
   const fmt = (minor: number) => formatMoney(minor, displayCurrency);
   const gainPositive = totalGainMinor >= 0;
+
+  if (error) {
+    return (
+      <Page title="Assets">
+        <ErrorCard
+          title="Couldn't load assets"
+          message={error}
+          onRetry={() => void reload()}
+        />
+      </Page>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Page title="Assets">
+        <SkeletonList count={4} />
+      </Page>
+    );
+  }
+
+  if (assets.length === 0) {
+    return (
+      <Page title="Assets">
+        <EmptyState
+          icon="◆"
+          title="No assets yet"
+          message="Add your crypto, stocks, ETFs, or cash to track portfolio value and gains."
+          cta={{
+            label: '+ Add asset',
+            onClick: () => setAssetModal({ existing: null }),
+          }}
+        />
+        {assetModal && (
+          <AssetModal
+            existing={assetModal.existing}
+            onClose={() => setAssetModal(null)}
+            onSave={async (asset) => {
+              await saveAsset(asset);
+              setAssetModal(null);
+            }}
+          />
+        )}
+      </Page>
+    );
+  }
 
   return (
     <Page title="Assets">
@@ -66,10 +121,17 @@ export function Assets() {
             }}
           >
             <div>
-              <div className="fm-secondary" style={{ fontWeight: 600, fontSize: 14 }}>
+              <div
+                className="fm-secondary"
+                style={{ fontWeight: 600, fontSize: 14 }}
+              >
                 Portfolio value
               </div>
-              <div className="fm-hero-amount" style={{ marginTop: 4 }} aria-live="polite">
+              <div
+                className="fm-hero-amount"
+                style={{ marginTop: 4 }}
+                aria-live="polite"
+              >
                 {loading ? '—' : fmt(totalValueMinor)}
               </div>
               <div
@@ -87,7 +149,10 @@ export function Assets() {
                     ).toFixed(1)}%)`}
               </div>
             </div>
-            <CurrencySwitcher value={displayCurrency} onChange={setDisplayCurrency} />
+            <CurrencySwitcher
+              value={displayCurrency}
+              onChange={setDisplayCurrency}
+            />
           </div>
         </GlassCard>
 
@@ -109,8 +174,16 @@ export function Assets() {
                 flexWrap: 'wrap',
               }}
             >
-              <DistributionDonut slices={distribution} />
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, flex: 1, minWidth: 180 }}>
+              <DistributionDonut slices={distribution} format={fmt} />
+              <ul
+                style={{
+                  listStyle: 'none',
+                  margin: 0,
+                  padding: 0,
+                  flex: 1,
+                  minWidth: 180,
+                }}
+              >
                 {distribution.map((s) => (
                   <li
                     key={s.type}
@@ -146,9 +219,16 @@ export function Assets() {
         <GlassCard>
           <div
             className="fm-row"
-            style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}
+            style={{
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 8,
+            }}
           >
-            <span className="fm-secondary" style={{ fontWeight: 600, fontSize: 14 }}>
+            <span
+              className="fm-secondary"
+              style={{ fontWeight: 600, fontSize: 14 }}
+            >
               Holdings
             </span>
             <button
@@ -212,7 +292,11 @@ function CurrencySwitcher({
   onChange: (c: CurrencyCode) => void;
 }) {
   return (
-    <div role="group" aria-label="Display currency" style={{ display: 'flex', gap: 6 }}>
+    <div
+      role="group"
+      aria-label="Display currency"
+      style={{ display: 'flex', gap: 6 }}
+    >
       {DISPLAY_CURRENCIES.map((c) => (
         <button
           key={c}
@@ -255,7 +339,11 @@ function AssetRow({
         flexWrap: 'wrap',
       }}
     >
-      <span className="fm-icon-tile" style={{ color: TYPE_COLOR[asset.type] }} aria-hidden="true">
+      <span
+        className="fm-icon-tile"
+        style={{ color: TYPE_COLOR[asset.type] }}
+        aria-hidden="true"
+      >
         {assetTypeLabel(asset.type).charAt(0)}
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
@@ -313,7 +401,13 @@ function AssetRow({
 }
 
 /** Inline-SVG donut of the by-type distribution (mirrors the iOS Swift Charts donut). */
-function DistributionDonut({ slices }: { slices: AssetSlice[] }) {
+function DistributionDonut({
+  slices,
+  format,
+}: {
+  slices: AssetSlice[];
+  format: (minor: number) => string;
+}) {
   const size = 160;
   const cx = size / 2;
   const cy = size / 2;
@@ -321,52 +415,61 @@ function DistributionDonut({ slices }: { slices: AssetSlice[] }) {
   const stroke = 26;
   const circumference = 2 * Math.PI * r;
   let offset = 0;
+  const { summary, rows } = describeAllocation(slices, format);
 
   return (
-    <svg
-      viewBox={`0 0 ${size} ${size}`}
-      width={size}
-      height={size}
-      role="img"
-      aria-label="Portfolio allocation by asset type"
-    >
-      <circle
-        cx={cx}
-        cy={cy}
-        r={r}
-        fill="none"
-        stroke="var(--fm-glass-border)"
-        strokeWidth={stroke}
+    <div>
+      <span className="fm-sr-only" role="img" aria-label={summary} />
+      <ChartDataTable
+        caption="Portfolio allocation by asset type"
+        labelHeader="Type"
+        valueHeader="Share and value"
+        rows={rows}
       />
-      {slices.map((s) => {
-        const len = s.share * circumference;
-        const seg = (
-          <circle
-            key={s.type}
-            cx={cx}
-            cy={cy}
-            r={r}
-            fill="none"
-            stroke={TYPE_COLOR[s.type]}
-            strokeWidth={stroke}
-            strokeDasharray={`${len} ${circumference - len}`}
-            strokeDashoffset={-offset}
-            transform={`rotate(-90 ${cx} ${cy})`}
-          />
-        );
-        offset += len;
-        return seg;
-      })}
-      <text
-        x={cx}
-        y={cy + 5}
-        textAnchor="middle"
-        fontSize={15}
-        fontWeight={650}
-        fill="currentColor"
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        width={size}
+        height={size}
+        aria-hidden="true"
       >
-        {slices.length} types
-      </text>
-    </svg>
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="var(--fm-glass-border)"
+          strokeWidth={stroke}
+        />
+        {slices.map((s) => {
+          const len = s.share * circumference;
+          const seg = (
+            <circle
+              key={s.type}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill="none"
+              stroke={TYPE_COLOR[s.type]}
+              strokeWidth={stroke}
+              strokeDasharray={`${len} ${circumference - len}`}
+              strokeDashoffset={-offset}
+              transform={`rotate(-90 ${cx} ${cy})`}
+            />
+          );
+          offset += len;
+          return seg;
+        })}
+        <text
+          x={cx}
+          y={cy + 5}
+          textAnchor="middle"
+          fontSize={15}
+          fontWeight={650}
+          fill="currentColor"
+        >
+          {slices.length} types
+        </text>
+      </svg>
+    </div>
   );
 }

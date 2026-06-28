@@ -6,7 +6,11 @@ import type { Subscription, SubscriptionRepository } from './types';
 import { monthlyAmountMinor } from './types';
 import { InMemorySubscriptionRepository } from './repository';
 import { getRepositories } from '../../lib/repositories';
-import { CurrencyConverter, type CurrencyCode, type ExchangeRates } from '../../core/currency';
+import {
+  CurrencyConverter,
+  type CurrencyCode,
+  type ExchangeRates,
+} from '../../core/currency';
 
 // Fixed sample rate snapshot — in production this comes from the market-data
 // Edge Function via the ExchangeRateProvider repository (docs/13 §2).
@@ -20,6 +24,10 @@ const SAMPLE_RATES: ExchangeRates = {
 export interface UseSubscriptions {
   subscriptions: Subscription[];
   loading: boolean;
+  /** Captured load error (null on the happy path); drives the inline error card. */
+  error: string | null;
+  /** Re-run the load (the error card's Retry action). */
+  reload: () => Promise<void>;
   add: (sub: Subscription) => Promise<void>;
   remove: (id: string) => Promise<void>;
   /** Total monthly-equivalent spend converted to `displayCurrency`, in minor units. */
@@ -27,15 +35,24 @@ export interface UseSubscriptions {
 }
 
 export function useSubscriptions(
-  repository: SubscriptionRepository = getRepositories().subscriptions,
+  repository: SubscriptionRepository = getRepositories().subscriptions
 ): UseSubscriptions {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setSubscriptions(await repository.all());
-    setLoading(false);
+    setError(null);
+    try {
+      setSubscriptions(await repository.all());
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : 'Failed to load subscriptions.'
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [repository]);
 
   useEffect(() => {
@@ -47,7 +64,7 @@ export function useSubscriptions(
       await repository.upsert(sub);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
 
   const remove = useCallback(
@@ -55,7 +72,7 @@ export function useSubscriptions(
       await repository.remove(id);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
 
   const converter = useMemo(() => new CurrencyConverter(SAMPLE_RATES), []);
@@ -63,10 +80,18 @@ export function useSubscriptions(
   const monthlyTotalMinor = useCallback(
     (displayCurrency: CurrencyCode): number =>
       monthlyTotalForDisplay(subscriptions, displayCurrency, converter),
-    [subscriptions, converter],
+    [subscriptions, converter]
   );
 
-  return { subscriptions, loading, add, remove, monthlyTotalMinor };
+  return {
+    subscriptions,
+    loading,
+    error,
+    reload: load,
+    add,
+    remove,
+    monthlyTotalMinor,
+  };
 }
 
 /**
@@ -76,7 +101,7 @@ export function useSubscriptions(
 export function monthlyTotalForDisplay(
   subscriptions: Subscription[],
   displayCurrency: CurrencyCode,
-  converter: CurrencyConverter,
+  converter: CurrencyConverter
 ): number {
   let total = 0;
   for (const sub of subscriptions) {
@@ -91,4 +116,5 @@ export function monthlyTotalForDisplay(
 }
 
 /** A single shared in-memory repo so all screens see the same sample/added data. */
-export const sharedRepository: SubscriptionRepository = new InMemorySubscriptionRepository();
+export const sharedRepository: SubscriptionRepository =
+  new InMemorySubscriptionRepository();

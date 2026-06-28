@@ -23,6 +23,7 @@ struct ImportView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: FinmateTokens.spacing) {
+                if isInitial { initialEmptyState }
                 editorCard
                 if let preview {
                     previewSummaryCard(preview)
@@ -51,6 +52,40 @@ struct ImportView: View {
             }
             await store.load()
         }
+    }
+
+    /// True before the user has typed anything or run a preview/import — the
+    /// initial empty state guiding them to paste or load the sample.
+    private var isInitial: Bool {
+        csvText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && preview == nil && importedCount == nil
+    }
+
+    // MARK: Initial empty state
+
+    private var initialEmptyState: some View {
+        GlassCard {
+            VStack(spacing: 10) {
+                Image(systemName: "square.and.arrow.down.on.square")
+                    .font(.largeTitle)
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                Text("Import subscriptions")
+                    .font(.headline)
+                Text("Paste CSV below or load the sample to preview, then import the valid rows.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button {
+                    csvText = Self.sampleCSV
+                } label: {
+                    Label("Load sample CSV", systemImage: "doc.text")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Editor

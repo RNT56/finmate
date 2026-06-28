@@ -33,6 +33,10 @@ export interface MonthView {
 
 export interface UseCalendar {
   loading: boolean;
+  /** Captured load error (null on the happy path); drives the inline error card. */
+  error: string | null;
+  /** Re-run the load (the error card's Retry action). */
+  reload: () => Promise<void>;
   view: MonthView;
   /** All events in the viewed month, sorted by date then kind. */
   events: CalendarEvent[];
@@ -45,54 +49,65 @@ export interface UseCalendar {
 /** The fixed reference "today" so the demo is deterministic (matches docs/13). */
 const REFERENCE = utcDate(2026, 6, 28);
 
-const sharedSubscriptionRepository: SubscriptionRepository = new InMemorySubscriptionRepository();
+const sharedSubscriptionRepository: SubscriptionRepository =
+  new InMemorySubscriptionRepository();
 
 export function useCalendar(
-  initialView: MonthView = { year: REFERENCE.getUTCFullYear(), month: REFERENCE.getUTCMonth() + 1 },
+  initialView: MonthView = {
+    year: REFERENCE.getUTCFullYear(),
+    month: REFERENCE.getUTCMonth() + 1,
+  },
   subscriptionRepo: SubscriptionRepository = sharedSubscriptionRepository,
-  cashFlowRepo: CashFlowRepository = sharedCashFlowRepository,
+  cashFlowRepo: CashFlowRepository = sharedCashFlowRepository
 ): UseCalendar {
   const [view, setView] = useState<MonthView>(initialView);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [incomes, setIncomes] = useState<IncomeEntity[]>([]);
   const [subscriptions, setSubscriptions] = useState<SubscriptionEntity[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpenseEntity[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [subs, inc, fix] = await Promise.all([
-      subscriptionRepo.all(),
-      cashFlowRepo.incomes(),
-      cashFlowRepo.fixedExpenses(),
-    ]);
-    setSubscriptions(
-      subs.map((s) => ({
-        title: s.name,
-        amountMinor: s.amountMinor,
-        currency: s.currency,
-        billingPeriod: s.billingPeriod,
-        startDate: parseISO(s.startDate) ?? REFERENCE,
-      })),
-    );
-    setIncomes(
-      inc.map((i) => ({
-        title: i.name,
-        amountMinor: i.amountMinor,
-        currency: i.currency,
-        frequency: i.frequency,
-        anchor: parseISO(i.nextPayment),
-      })),
-    );
-    setFixedExpenses(
-      fix.map((f) => ({
-        title: f.name,
-        amountMinor: f.amountMinor,
-        currency: f.currency,
-        frequency: f.billingPeriod,
-        dueDate: parseISO(f.dueDate),
-      })),
-    );
-    setLoading(false);
+    setError(null);
+    try {
+      const [subs, inc, fix] = await Promise.all([
+        subscriptionRepo.all(),
+        cashFlowRepo.incomes(),
+        cashFlowRepo.fixedExpenses(),
+      ]);
+      setSubscriptions(
+        subs.map((s) => ({
+          title: s.name,
+          amountMinor: s.amountMinor,
+          currency: s.currency,
+          billingPeriod: s.billingPeriod,
+          startDate: parseISO(s.startDate) ?? REFERENCE,
+        }))
+      );
+      setIncomes(
+        inc.map((i) => ({
+          title: i.name,
+          amountMinor: i.amountMinor,
+          currency: i.currency,
+          frequency: i.frequency,
+          anchor: parseISO(i.nextPayment),
+        }))
+      );
+      setFixedExpenses(
+        fix.map((f) => ({
+          title: f.name,
+          amountMinor: f.amountMinor,
+          currency: f.currency,
+          frequency: f.billingPeriod,
+          dueDate: parseISO(f.dueDate),
+        }))
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load calendar.');
+    } finally {
+      setLoading(false);
+    }
   }, [subscriptionRepo, cashFlowRepo]);
 
   useEffect(() => {
@@ -102,12 +117,20 @@ export function useCalendar(
   const windowStart = useMemo(() => utcDate(view.year, view.month, 1), [view]);
   const windowEnd = useMemo(
     () => utcDate(view.year, view.month + 1, 0), // day 0 of next month = last day
-    [view],
+    [view]
   );
 
   const monthEvents = useMemo(
-    () => projectEvents(windowStart, windowEnd, incomes, subscriptions, fixedExpenses, REFERENCE),
-    [windowStart, windowEnd, incomes, subscriptions, fixedExpenses],
+    () =>
+      projectEvents(
+        windowStart,
+        windowEnd,
+        incomes,
+        subscriptions,
+        fixedExpenses,
+        REFERENCE
+      ),
+    [windowStart, windowEnd, incomes, subscriptions, fixedExpenses]
   );
 
   const eventsByDay = useMemo(() => {
@@ -122,15 +145,25 @@ export function useCalendar(
   }, [monthEvents]);
 
   const goPrevMonth = useCallback(() => {
-    setView((v) => (v.month === 1 ? { year: v.year - 1, month: 12 } : { year: v.year, month: v.month - 1 }));
+    setView((v) =>
+      v.month === 1
+        ? { year: v.year - 1, month: 12 }
+        : { year: v.year, month: v.month - 1 }
+    );
   }, []);
 
   const goNextMonth = useCallback(() => {
-    setView((v) => (v.month === 12 ? { year: v.year + 1, month: 1 } : { year: v.year, month: v.month + 1 }));
+    setView((v) =>
+      v.month === 12
+        ? { year: v.year + 1, month: 1 }
+        : { year: v.year, month: v.month + 1 }
+    );
   }, []);
 
   return {
     loading,
+    error,
+    reload: load,
     view,
     events: monthEvents,
     eventsByDay,

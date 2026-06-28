@@ -9,16 +9,32 @@
 
 import { useMemo, useState, type CSSProperties } from 'react';
 import { GlassCard } from '../../components/GlassCard';
+import { ErrorCard } from '../../components/ErrorCard';
+import { SkeletonList } from '../../components/Skeleton';
 import { Page } from '../../components/AppShell';
 import { formatMoney } from '../../core/money';
-import { daysInMonth, type CalendarEvent, type EventKind } from '../../core/recurrence';
+import {
+  daysInMonth,
+  type CalendarEvent,
+  type EventKind,
+} from '../../core/recurrence';
 import { useCalendar } from './useCalendar';
 
 const EUR_LOCALE = 'de-DE';
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 const KIND_COLOR: Record<EventKind, string> = {
@@ -44,14 +60,24 @@ function dayKey(year: number, month1: number, day: number): string {
 }
 
 export function Calendar() {
-  const { loading, view, eventsByDay, goPrevMonth, goNextMonth } = useCalendar();
+  const {
+    loading,
+    error,
+    reload,
+    view,
+    events,
+    eventsByDay,
+    goPrevMonth,
+    goNextMonth,
+  } = useCalendar();
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const totalDays = daysInMonth(view.year, view.month);
   const leadingBlanks = weekdayMondayFirst(view.year, view.month, 1);
 
   // Reset selection if it falls outside the current month after navigation.
-  const validSelection = selectedDay !== null && selectedDay <= totalDays ? selectedDay : null;
+  const validSelection =
+    selectedDay !== null && selectedDay <= totalDays ? selectedDay : null;
 
   const cells = useMemo(() => {
     const out: Array<{ day: number | null }> = [];
@@ -63,10 +89,34 @@ export function Calendar() {
   const selectedEvents: CalendarEvent[] =
     validSelection === null
       ? []
-      : eventsByDay.get(dayKey(view.year, view.month, validSelection)) ?? [];
+      : (eventsByDay.get(dayKey(view.year, view.month, validSelection)) ?? []);
 
   const fmt = (minor: number, currency: CalendarEvent['currency']) =>
     formatMoney(minor, currency, currency === 'EUR' ? EUR_LOCALE : undefined);
+
+  if (error) {
+    return (
+      <Page title="Calendar">
+        <ErrorCard
+          title="Couldn't load calendar"
+          message={error}
+          onRetry={() => void reload()}
+        />
+      </Page>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Page title="Calendar">
+        <SkeletonList count={2} lines={4} />
+      </Page>
+    );
+  }
+
+  // After load with nothing scheduled anywhere this month, the empty grid would
+  // read as broken — surface a friendly note inside the day-detail panel instead.
+  const monthHasEvents = events.length > 0;
 
   return (
     <Page title="Calendar">
@@ -80,24 +130,47 @@ export function Calendar() {
               marginBottom: 16,
             }}
           >
-            <NavButton label="Previous month" glyph="‹" onClick={() => { setSelectedDay(null); goPrevMonth(); }} />
+            <NavButton
+              label="Previous month"
+              glyph="‹"
+              onClick={() => {
+                setSelectedDay(null);
+                goPrevMonth();
+              }}
+            />
             <div style={{ fontWeight: 700, fontSize: 18 }} aria-live="polite">
               {MONTHS[view.month - 1]} {view.year}
             </div>
-            <NavButton label="Next month" glyph="›" onClick={() => { setSelectedDay(null); goNextMonth(); }} />
+            <NavButton
+              label="Next month"
+              glyph="›"
+              onClick={() => {
+                setSelectedDay(null);
+                goNextMonth();
+              }}
+            />
           </div>
 
           <div
             role="grid"
             aria-label={`${MONTHS[view.month - 1]} ${view.year}`}
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: 6,
+            }}
           >
             {WEEKDAYS.map((w) => (
               <div
                 key={w}
                 role="columnheader"
                 className="fm-secondary"
-                style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, paddingBottom: 4 }}
+                style={{
+                  textAlign: 'center',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  paddingBottom: 4,
+                }}
               >
                 {w}
               </div>
@@ -107,7 +180,8 @@ export function Calendar() {
               if (cell.day === null) {
                 return <div key={`blank-${idx}`} aria-hidden="true" />;
               }
-              const dayEvents = eventsByDay.get(dayKey(view.year, view.month, cell.day)) ?? [];
+              const dayEvents =
+                eventsByDay.get(dayKey(view.year, view.month, cell.day)) ?? [];
               const isSelected = validSelection === cell.day;
               const kinds = uniqueKinds(dayEvents);
               return (
@@ -120,8 +194,19 @@ export function Calendar() {
                   aria-label={`${MONTHS[view.month - 1]} ${cell.day}, ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}`}
                   style={dayCellStyle(isSelected)}
                 >
-                  <span style={{ fontSize: 14, fontWeight: isSelected ? 700 : 500 }}>{cell.day}</span>
-                  <span style={{ display: 'flex', gap: 3, minHeight: 8, justifyContent: 'center' }}>
+                  <span
+                    style={{ fontSize: 14, fontWeight: isSelected ? 700 : 500 }}
+                  >
+                    {cell.day}
+                  </span>
+                  <span
+                    style={{
+                      display: 'flex',
+                      gap: 3,
+                      minHeight: 8,
+                      justifyContent: 'center',
+                    }}
+                  >
                     {kinds.map((k) => (
                       <span
                         key={k}
@@ -145,14 +230,19 @@ export function Calendar() {
         </GlassCard>
 
         <GlassCard>
-          <div className="fm-secondary" style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+          <div
+            className="fm-secondary"
+            style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}
+          >
             {validSelection === null
               ? 'Select a day'
               : `${MONTHS[view.month - 1]} ${validSelection}, ${view.year}`}
           </div>
           {validSelection === null ? (
             <div className="fm-secondary" style={{ padding: '8px 0' }}>
-              {loading ? 'Loading…' : 'Tap a day to see its income, subscriptions and bills.'}
+              {monthHasEvents
+                ? 'Tap a day to see its income, subscriptions and bills.'
+                : 'Nothing scheduled this month. Add income, subscriptions, or bills to see them here.'}
             </div>
           ) : selectedEvents.length === 0 ? (
             <div className="fm-secondary" style={{ padding: '8px 0' }}>
@@ -168,24 +258,37 @@ export function Calendar() {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '10px 0',
-                    borderTop: i === 0 ? 'none' : '1px solid var(--fm-glass-border)',
+                    borderTop:
+                      i === 0 ? 'none' : '1px solid var(--fm-glass-border)',
                   }}
                 >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span
+                    style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+                  >
                     <span
                       aria-hidden="true"
-                      style={{ width: 10, height: 10, borderRadius: '50%', background: KIND_COLOR[e.kind] }}
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: KIND_COLOR[e.kind],
+                      }}
                     />
                     <span>
                       <span style={{ fontWeight: 600 }}>{e.title}</span>
-                      <span className="fm-secondary" style={{ display: 'block', fontSize: 12 }}>
+                      <span
+                        className="fm-secondary"
+                        style={{ display: 'block', fontSize: 12 }}
+                      >
                         {KIND_LABEL[e.kind]}
                       </span>
                     </span>
                   </span>
                   <span
                     className="fm-amount"
-                    style={{ color: e.kind === 'income' ? 'var(--fm-up)' : 'inherit' }}
+                    style={{
+                      color: e.kind === 'income' ? 'var(--fm-up)' : 'inherit',
+                    }}
                   >
                     {e.kind === 'income' ? '+' : '−'}
                     {fmt(e.amountMinor, e.currency)}
@@ -195,7 +298,8 @@ export function Calendar() {
             </ul>
           )}
           <div className="fm-secondary" style={{ fontSize: 12, marginTop: 10 }}>
-            Reminders are delivered as local notifications on iPhone. Remote push is post-v1.
+            Reminders are delivered as local notifications on iPhone. Remote
+            push is post-v1.
           </div>
         </GlassCard>
       </div>
@@ -217,14 +321,24 @@ function dayCellStyle(selected: boolean): CSSProperties {
     padding: '8px 0 6px',
     borderRadius: 'var(--fm-radius-sm)',
     border: selected ? '1px solid var(--fm-accent)' : '1px solid transparent',
-    background: selected ? 'color-mix(in srgb, var(--fm-accent) 14%, transparent)' : 'transparent',
+    background: selected
+      ? 'color-mix(in srgb, var(--fm-accent) 14%, transparent)'
+      : 'transparent',
     color: 'var(--fm-label)',
     cursor: 'pointer',
     font: 'inherit',
   };
 }
 
-function NavButton({ label, glyph, onClick }: { label: string; glyph: string; onClick: () => void }) {
+function NavButton({
+  label,
+  glyph,
+  onClick,
+}: {
+  label: string;
+  glyph: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
@@ -252,10 +366,19 @@ function Legend() {
   return (
     <div style={{ display: 'flex', gap: 16, marginTop: 14, flexWrap: 'wrap' }}>
       {items.map((k) => (
-        <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }} className="fm-secondary">
+        <span
+          key={k}
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          className="fm-secondary"
+        >
           <span
             aria-hidden="true"
-            style={{ width: 8, height: 8, borderRadius: '50%', background: KIND_COLOR[k] }}
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: KIND_COLOR[k],
+            }}
           />
           <span style={{ fontSize: 12 }}>{KIND_LABEL[k]}</span>
         </span>
