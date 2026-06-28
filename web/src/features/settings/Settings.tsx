@@ -15,6 +15,12 @@ import {
 } from '../../core/preferences';
 import type { CurrencyCode } from '../../core/currency';
 import { usePreferences } from './usePreferences';
+import {
+  buildExportBundle,
+  downloadExportBundle,
+  type ExportSources,
+} from '../../core/dataExport';
+import { getRepositories } from '../../lib/repositories';
 
 const APPEARANCES: { value: Appearance; label: string }[] = [
   { value: 'system', label: 'System' },
@@ -26,6 +32,28 @@ const CURRENCIES: CurrencyCode[] = ['EUR', 'USD', 'BTC'];
 
 export function Settings() {
   const { preferences, update } = usePreferences();
+
+  // Wire Export Data (docs/07 §9.3): read every owned entity from the SELECTED
+  // repositories (Supabase when configured, in-memory sample otherwise — the same
+  // selection the rest of the app uses) and download a round-trippable JSON bundle
+  // with money kept as raw minor units + currency.
+  const handleExport = async () => {
+    try {
+      const repos = getRepositories();
+      const sources: ExportSources = {
+        subscriptions: () => repos.subscriptions.all(),
+        incomeSources: () => repos.cashFlow.incomes(),
+        fixedExpenses: () => repos.cashFlow.fixedExpenses(),
+        variableExpenses: () => repos.cashFlow.variableExpenses(),
+        financialAssets: () => repos.assets.all(),
+        preferences: () => preferences,
+      };
+      const bundle = await buildExportBundle(sources);
+      downloadExportBundle(bundle);
+    } catch {
+      window.alert('Export failed. Please try again.');
+    }
+  };
 
   return (
     <Page title="Settings">
@@ -110,13 +138,16 @@ export function Settings() {
 
         {/* ---- Data ---- */}
         <Section title="Data">
-          <SettingRow label="Export data" hint="Download your data as CSV/JSON (coming soon).">
+          <SettingRow
+            label="Export data"
+            hint="Download all your data as finmate-export.json — money kept as raw minor units + currency, with zero precision loss."
+          >
             <button
               type="button"
               className="fm-btn fm-btn-ghost"
               style={{ padding: '0.5rem 0.875rem', fontSize: '0.8125rem' }}
-              aria-label="Export your data"
-              onClick={() => window.alert('Data export is not wired up in this demo yet.')}
+              aria-label="Export your data as JSON"
+              onClick={handleExport}
             >
               Export
             </button>

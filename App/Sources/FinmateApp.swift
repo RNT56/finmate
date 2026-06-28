@@ -13,19 +13,43 @@ struct FinmateApp: App {
     /// Built from the chosen environment's `PreferencesRepository`.
     @State private var preferencesStore: PreferencesStore
 
+    /// Biometric app-lock runtime (docs/07). No-op when the toggle is off (default).
+    @State private var appLock: AppLockController
+
+    @Environment(\.scenePhase) private var scenePhase
+
     init() {
         let repositories = RepositoryEnvironment.resolve()
         self.repositories = repositories
-        _preferencesStore = State(initialValue: PreferencesStore(repository: repositories.preferences))
+        let store = PreferencesStore(repository: repositories.preferences)
+        _preferencesStore = State(initialValue: store)
+        _appLock = State(initialValue: AppLockController(preferencesStore: store))
     }
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environment(\.repositories, repositories)
-                .environment(preferencesStore)
-                .preferredColorScheme(preferencesStore.appearance.preferredColorScheme)
-                .task { await preferencesStore.load() }
+            ZStack {
+                RootView()
+                    .environment(\.repositories, repositories)
+                    .environment(preferencesStore)
+                if appLock.isLocked {
+                    AppLockOverlay(controller: appLock)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: appLock.isLocked)
+            .preferredColorScheme(preferencesStore.appearance.preferredColorScheme)
+            .task {
+                await preferencesStore.load()
+                // Lock on launch if the preference is enabled (after prefs load).
+                appLock.start()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                switch phase {
+                case .active:     appLock.didBecomeActive()
+                case .inactive, .background: appLock.lockForBackground()
+                @unknown default: break
+                }
+            }
         }
     }
 }

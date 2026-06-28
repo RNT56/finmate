@@ -1,6 +1,8 @@
 import SwiftUI
 import Observation
 import Domain
+import DataLayer
+import UniformTypeIdentifiers
 
 // MARK: - M7 Settings (docs/02 §12, docs/05 §3.10, docs/07)
 // The Settings surface: appearance, default display currency, reminders,
@@ -72,11 +74,14 @@ final class PreferencesStore {
 
 struct SettingsView: View {
     @Environment(PreferencesStore.self) private var store
+    @Environment(\.repositories) private var repositories
 
     @State private var showingExport = false
     @State private var showingDeleteConfirm = false
     @State private var showingDeleteFinalConfirm = false
-    @State private var exportPayload = ""
+    @State private var exportData: Data?
+    @State private var exporting = false
+    @State private var exportError: String?
 
     private let leadTimeRange = UserPreferences.reminderLeadTimeRange
 
@@ -175,11 +180,17 @@ struct SettingsView: View {
             // MARK: Data
             Section {
                 Button {
-                    exportPayload = Self.makeExportStub(store.preferences)
-                    showingExport = true
+                    Task { await runExport() }
                 } label: {
-                    Label("Export data", systemImage: "square.and.arrow.up")
+                    HStack {
+                        Label("Export data", systemImage: "square.and.arrow.up")
+                        if exporting {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
                 }
+                .disabled(exporting)
                 Button(role: .destructive) {
                     showingDeleteConfirm = true
                 } label: {
@@ -207,7 +218,17 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingExport) {
-            ExportDataView(payload: exportPayload)
+            if let data = exportData {
+                ExportDataView(data: data)
+            }
+        }
+        .alert("Export failed", isPresented: Binding(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportError ?? "")
         }
         // Double-confirm account deletion (docs/07) — first dialog, then a final one.
         .confirmationDialog(
@@ -240,20 +261,33 @@ struct SettingsView: View {
         return "\(v) (\(b))"
     }
 
-    /// Stub export payload — the real exporter assembles a JSON/CSV bundle (docs/07).
-    static func makeExportStub(_ prefs: UserPreferences) -> String {
-        """
-        Finmate data export (stub)
+    /// Build the real export `ExportBundle` from the live repositories and encode
+    /// it to JSON `Data` (docs/07 §9.3). Money stays in RAW minor units + currency.
+    @MainActor
+    private func runExport() async {
+        exporting = true
+        defer { exporting = false }
+        do {
+            async let subs = repositories.subscriptions.all()
+            async let income = repositories.income.all()
+            async let fixed = repositories.expenses.fixed()
+            async let variable = repositories.expenses.variable()
+            async let assets = repositories.assets.all()
 
-        appearance: \(prefs.appearance.rawValue)
-        defaultCurrency: \(prefs.defaultCurrency.rawValue)
-        biometricLock: \(prefs.biometricLockEnabled)
-        paymentReminders: \(prefs.paymentRemindersEnabled)
-        paydayReminders: \(prefs.paydayRemindersEnabled)
-        reminderLeadTimeDays: \(prefs.reminderLeadTimeDays)
-
-        (The production export bundles subscriptions, income, expenses, and assets.)
-        """
+            let bundle = ExportBundle(
+                exportedAt: Date(),
+                subscriptions: try await subs,
+                income: try await income,
+                fixedExpenses: try await fixed,
+                variableExpenses: try await variable,
+                assets: try await assets,
+                preferences: store.preferences
+            )
+            exportData = try DataExport.encode(bundle)
+            showingExport = true
+        } catch {
+            exportError = error.localizedDescription
+        }
     }
 
     /// Stub for the `delete-account` Edge Function call (docs/07). In production this
@@ -263,18 +297,57 @@ struct SettingsView: View {
     }
 }
 
-/// Share-sheet wrapper for the export payload (stub content).
+/// A `finmate-export.json` file backed by in-memory `Data`, exposed as a
+/// `Transferable` so `ShareLink` writes a real `.json` file to the share sheet.
+struct ExportFile: Transferable {
+    let data: Data
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .json) { file in
+            file.data
+        }
+        .suggestedFileName(DataExport.fileName)
+    }
+}
+
+/// Share-sheet wrapper presenting the real JSON export as a `finmate-export.json`
+/// file (docs/07 §9.3).
 struct ExportDataView: View {
-    let payload: String
+    let data: Data
     @Environment(\.dismiss) private var dismiss
+
+    private var sizeLabel: String {
+        ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
+    }
 
     var body: some View {
         NavigationStack {
-            ShareLink(item: payload) {
-                Label("Share export", systemImage: "square.and.arrow.up")
+            VStack(spacing: FinmateTokens.spacing) {
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label(DataExport.fileName, systemImage: "doc.text")
+                            .font(.headline)
+                        Text("A JSON copy of your subscriptions, income, expenses, assets, and preferences. Amounts are exported in raw minor units with their own currency.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text(sizeLabel)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                ShareLink(
+                    item: ExportFile(data: data),
+                    preview: SharePreview(DataExport.fileName)
+                ) {
+                    Label("Share export", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                Spacer()
             }
             .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(FinmateGradient())
             .navigationTitle("Export data")
             .navigationBarTitleDisplayMode(.inline)
