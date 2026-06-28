@@ -1,15 +1,28 @@
 import SwiftUI
 import Domain
+import DataLayer
 
 @main
 struct FinmateApp: App {
+    /// Config-driven repository environment (Supabase when SUPABASE_URL +
+    /// SUPABASE_ANON_KEY resolve, else the in-memory sample repos — docs/03 §3).
+    private let repositories: RepositoryEnvironment
+
     /// App-root preferences store (M7). Owns appearance + display-currency +
     /// reminder/biometric prefs and drives `.preferredColorScheme` app-wide.
-    @State private var preferencesStore = PreferencesStore()
+    /// Built from the chosen environment's `PreferencesRepository`.
+    @State private var preferencesStore: PreferencesStore
+
+    init() {
+        let repositories = RepositoryEnvironment.resolve()
+        self.repositories = repositories
+        _preferencesStore = State(initialValue: PreferencesStore(repository: repositories.preferences))
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environment(\.repositories, repositories)
                 .environment(preferencesStore)
                 .preferredColorScheme(preferencesStore.appearance.preferredColorScheme)
                 .task { await preferencesStore.load() }

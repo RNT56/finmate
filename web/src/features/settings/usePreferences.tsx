@@ -15,8 +15,8 @@ import {
   type Appearance,
   type UserPreferences,
   type PreferencesRepository,
-  LocalStoragePreferencesRepository,
 } from '../../core/preferences';
+import { getRepositories } from '../../lib/repositories';
 
 interface PreferencesContextValue {
   preferences: UserPreferences;
@@ -59,7 +59,7 @@ export function PreferencesProvider({
   repository?: PreferencesRepository;
 }) {
   const repo = useMemo(
-    () => repository ?? new LocalStoragePreferencesRepository(),
+    () => repository ?? getRepositories().preferences,
     [repository],
   );
   const [preferences, setPreferences] = useState<UserPreferences>(() => repo.load());

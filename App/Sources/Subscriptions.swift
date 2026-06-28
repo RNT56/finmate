@@ -1,6 +1,7 @@
 import SwiftUI
 import Observation
 import Domain
+import DataLayer
 
 // MARK: - DataLayer (in-memory) — docs/03 §3. Implements the Domain repository
 // protocol; the real Supabase-backed implementation swaps in behind the same seam.
@@ -78,7 +79,9 @@ final class SubscriptionsStore {
 // MARK: - Views
 
 struct SubscriptionsListView: View {
+    @Environment(\.repositories) private var repositories
     @State private var store = SubscriptionsStore(repository: SampleData.repository)
+    @State private var didBind = false
     @State private var showingAdd = false
     @State private var showingAnalytics = false
 
@@ -136,7 +139,13 @@ struct SubscriptionsListView: View {
                         }
                 }
             }
-            .task { await store.load() }
+            .task {
+                if !didBind {
+                    store = SubscriptionsStore(repository: repositories.subscriptions)
+                    didBind = true
+                }
+                await store.load()
+            }
             .background(FinmateGradient())
         }
     }

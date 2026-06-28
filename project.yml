@@ -25,6 +25,8 @@ settings:
 packages:
   FinmateCore:
     path: Packages/FinmateCore
+  FinmateData:
+    path: Packages/FinmateData
 targets:
   Finmate:
     type: application
@@ -36,3 +38,5 @@ targets:
         product: Domain
       - package: FinmateCore
         product: Shared
+      - package: FinmateData
+        product: DataLayer

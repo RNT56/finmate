@@ -13,7 +13,8 @@ import {
   portfolioValueMinor,
 } from '../../core/assets';
 import { CurrencyConverter, type CurrencyCode, type ExchangeRates } from '../../core/currency';
-import { type AssetsRepository, sharedAssetsRepository } from './repository';
+import { type AssetsRepository } from './repository';
+import { getRepositories } from '../../lib/repositories';
 
 // Sample display rates (identical both clients so figures agree): in production these
 // come from the market-data Edge Function (ADR-0010), never a client-side provider.
@@ -42,7 +43,7 @@ export interface UseAssets {
 
 export function useAssets(
   displayCurrency: CurrencyCode,
-  repository: AssetsRepository = sharedAssetsRepository,
+  repository: AssetsRepository = getRepositories().assets,
 ): UseAssets {
   const [assets, setAssets] = useState<FinancialAsset[]>([]);
   const [loading, setLoading] = useState(true);

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Subscription, SubscriptionRepository } from './types';
 import { monthlyAmountMinor } from './types';
 import { InMemorySubscriptionRepository } from './repository';
+import { getRepositories } from '../../lib/repositories';
 import { CurrencyConverter, type CurrencyCode, type ExchangeRates } from '../../core/currency';
 
 // Fixed sample rate snapshot — in production this comes from the market-data
@@ -26,7 +27,7 @@ export interface UseSubscriptions {
 }
 
 export function useSubscriptions(
-  repository: SubscriptionRepository = sharedRepository,
+  repository: SubscriptionRepository = getRepositories().subscriptions,
 ): UseSubscriptions {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
