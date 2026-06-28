@@ -27,7 +27,11 @@ export function SubscriptionList() {
             ? 'Loading…'
             : `${subscriptions.length} service${subscriptions.length === 1 ? '' : 's'}`}
         </span>
-        <button className="fm-btn" onClick={() => setShowAdd(true)}>
+        <button
+          className="fm-btn"
+          data-testid="add-subscription"
+          onClick={() => setShowAdd(true)}
+        >
           + Add subscription
         </button>
       </div>

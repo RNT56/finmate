@@ -149,6 +149,7 @@ export function Login() {
             fontWeight: 700,
           }}
           aria-label="Try the demo without an account"
+          data-testid="try-demo"
           onClick={signInDemo}
         >
           Try the demo →

@@ -9,9 +9,17 @@ import globals from 'globals';
 // @typescript-eslint + react-hooks recommended, Prettier last to disable
 // stylistic rules (formatting is owned by Prettier, see .prettierrc).
 export default tseslint.config(
-  // Never lint build output, deps, or generated caches.
+  // Never lint build output, deps, generated caches, or E2E run artifacts.
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.tsbuildinfo'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'coverage/**',
+      '*.tsbuildinfo',
+      'test-results/**',
+      'playwright-report/**',
+      'blob-report/**',
+    ],
   },
 
   // Base JS + TypeScript recommended rule sets.
@@ -48,11 +56,23 @@ export default tseslint.config(
     },
   },
 
-  // Node-context config/build files (vite.config, eslint.config).
+  // Node-context config/build files (vite.config, eslint.config, playwright.config).
   {
     files: ['*.{js,ts}', 'vite.config.ts'],
     languageOptions: {
       globals: { ...globals.node },
+    },
+  },
+
+  // Playwright E2E specs — run outside src/ by the Playwright runner. They use
+  // Node globals (process.env) and, inside page.evaluate closures, browser
+  // globals (window). Not part of any tsconfig build, so tsc -b ignores them.
+  {
+    files: ['e2e/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser },
     },
   },
 
