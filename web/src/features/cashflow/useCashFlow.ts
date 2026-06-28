@@ -12,6 +12,7 @@ import {
 import type { CashFlowRepository, FixedExpense, IncomeSource, VariableExpense } from './types';
 import { fixedMonthlyAmountMinor } from './types';
 import { InMemoryCashFlowRepository } from './repository';
+import { getRepositories } from '../../lib/repositories';
 import { useSubscriptions } from '../subscriptions/useSubscriptions';
 
 export interface ExpenseBreakdownRow {
@@ -35,7 +36,7 @@ export interface UseCashFlow {
 const DISPLAY_CURRENCY: CurrencyCode = 'EUR';
 
 export function useCashFlow(
-  repository: CashFlowRepository = sharedCashFlowRepository,
+  repository: CashFlowRepository = getRepositories().cashFlow,
 ): UseCashFlow {
   const [incomes, setIncomes] = useState<IncomeSource[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);

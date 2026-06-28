@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 import Observation
 import Domain
+import DataLayer
 
 // MARK: - DataLayer (in-memory) — docs/03 §3. Income + expense repositories behind
 // the Domain protocols; the Supabase-backed implementations swap in behind the seam.
@@ -141,11 +142,13 @@ final class CashFlowStore {
 // MARK: - View
 
 struct CashFlowView: View {
+    @Environment(\.repositories) private var repositories
     @State private var store = CashFlowStore(
         incomeRepository: CashFlowSampleData.incomeRepository,
         expenseRepository: CashFlowSampleData.expenseRepository,
         subscriptions: SampleData.subscriptions
     )
+    @State private var didBind = false
 
     private let palette: [Color] = [.blue, .purple, .pink, .orange, .teal, .green, .indigo, .mint]
     private func color(for index: Int) -> Color { palette[index % palette.count] }
@@ -163,7 +166,20 @@ struct CashFlowView: View {
             }
             .navigationTitle("Cash Flow")
             .background(FinmateGradient())
-            .task { await store.load() }
+            .task {
+                if !didBind {
+                    // Subscriptions feed the expense roll-up; fetch them from the
+                    // injected repo so the bucket matches the Subscriptions tab.
+                    let subs = (try? await repositories.subscriptions.all()) ?? SampleData.subscriptions
+                    store = CashFlowStore(
+                        incomeRepository: repositories.income,
+                        expenseRepository: repositories.expenses,
+                        subscriptions: subs
+                    )
+                    didBind = true
+                }
+                await store.load()
+            }
         }
     }
 

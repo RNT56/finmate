@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 import Observation
 import Domain
+import DataLayer
 
 // MARK: - DataLayer (in-memory) — docs/03 §3. Implements the Domain AssetRepository;
 // the real Supabase-backed implementation swaps in behind the same seam.
@@ -146,8 +147,10 @@ enum AssetPalette {
 // MARK: - Views
 
 struct AssetsView: View {
+    @Environment(\.repositories) private var repositories
     @State private var store = AssetsStore(
         repository: AssetsSampleData.repository, rates: AssetsSampleData.sampleRates)
+    @State private var didBind = false
 
     var body: some View {
         ScrollView {
@@ -165,7 +168,16 @@ struct AssetsView: View {
         .navigationDestination(for: FinancialAsset.self) { asset in
             AssetDetailView(asset: asset, store: store)
         }
-        .task { await store.load() }
+        .task {
+            if !didBind {
+                // Display rates come from the injected ExchangeRateProvider (live
+                // market-data Edge Function or sample), falling back to the sample set.
+                let rates = (try? await repositories.exchangeRates.latestRates()) ?? AssetsSampleData.sampleRates
+                store = AssetsStore(repository: repositories.assets, rates: rates)
+                didBind = true
+            }
+            await store.load()
+        }
     }
 
     // MARK: Display-currency switcher (EUR / USD / BTC)

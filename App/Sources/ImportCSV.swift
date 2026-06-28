@@ -1,5 +1,6 @@
 import SwiftUI
 import Domain
+import DataLayer
 
 // MARK: - CSV import (docs/02 §8, docs/13 §9, M6) — paste · preview · partial import.
 //
@@ -9,9 +10,11 @@ import Domain
 // create path as manual add. A file picker is a follow-up (see note in the UI).
 
 struct ImportView: View {
-    /// Shares the same in-memory repository the Subscriptions tab reads, so imported
+    /// Shares the same repository the Subscriptions tab reads (injected), so imported
     /// rows appear there too.
+    @Environment(\.repositories) private var repositories
     @State private var store = SubscriptionsStore(repository: SampleData.repository)
+    @State private var didBind = false
 
     @State private var csvText: String = ""
     @State private var preview: ImportPreview?
@@ -41,7 +44,13 @@ struct ImportView: View {
         .navigationTitle("Import CSV")
         .navigationBarTitleDisplayMode(.inline)
         .background(FinmateGradient())
-        .task { await store.load() }
+        .task {
+            if !didBind {
+                store = SubscriptionsStore(repository: repositories.subscriptions)
+                didBind = true
+            }
+            await store.load()
+        }
     }
 
     // MARK: Editor

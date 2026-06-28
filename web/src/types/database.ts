@@ -21,7 +21,7 @@ export type PaymentMethod =
 export type CategoryKind = 'subscription' | 'expense';
 
 /** docs/05 §subscriptions */
-export interface SubscriptionRow {
+export type SubscriptionRow = {
   id: string;
   user_id: string;
   name: string;
@@ -45,7 +45,7 @@ export interface SubscriptionRow {
 }
 
 /** docs/05 §categories */
-export interface CategoryRow {
+export type CategoryRow = {
   id: string;
   user_id: string;
   name: string;
@@ -57,7 +57,7 @@ export interface CategoryRow {
 }
 
 /** docs/05 §income_sources */
-export interface IncomeSourceRow {
+export type IncomeSourceRow = {
   id: string;
   user_id: string;
   name: string;
@@ -70,7 +70,7 @@ export interface IncomeSourceRow {
 }
 
 /** docs/05 §fixed_expenses */
-export interface FixedExpenseRow {
+export type FixedExpenseRow = {
   id: string;
   user_id: string;
   name: string;
@@ -84,7 +84,7 @@ export interface FixedExpenseRow {
 }
 
 /** docs/05 §variable_expenses */
-export interface VariableExpenseRow {
+export type VariableExpenseRow = {
   id: string;
   user_id: string;
   name: string;
@@ -96,10 +96,56 @@ export interface VariableExpenseRow {
   updated_at: string;
 }
 
+/**
+ * The asset classes the Postgres `financial_assets.asset_type` CHECK allows
+ * (docs/05 §3.7). Note these differ from the Domain `AssetType` (`etf`/`cash`):
+ * the repository mapper translates between the two vocabularies.
+ */
+export type AssetTypeRow = 'stock' | 'crypto' | 'savings' | 'real_estate' | 'other';
+
+/** docs/05 §3.7 financial_assets (average-cost semantics). */
+export type FinancialAssetRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  asset_type: AssetTypeRow;
+  currency: CurrencyCode;
+  /** Current TOTAL market value (minor units). */
+  value_minor: number;
+  /** Units held; numeric(38,8) arrives as `number` (well within range). */
+  quantity: number | null;
+  /** TOTAL cost basis (minor units), average-cost. */
+  purchase_price_minor: number | null;
+  purchase_date: string | null;
+  /** Latest PER-UNIT price (minor units). */
+  current_price_minor: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** docs/05 §3.10 user_preferences (per-user singleton). */
+export type UserPreferencesRow = {
+  id: string;
+  user_id: string;
+  appearance: 'system' | 'light' | 'dark';
+  biometric_lock_enabled: boolean;
+  biometric_lock_timeout_seconds: number;
+  default_currency: CurrencyCode;
+  payment_reminders_enabled: boolean;
+  payday_reminders_enabled: boolean;
+  reminder_lead_time_days: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface TableShape<Row> {
   Row: Row;
   Insert: Partial<Row>;
   Update: Partial<Row>;
+  /** No FK relationships are modeled in this hand-written contract. Required by
+   *  @supabase/supabase-js's GenericTable so it can resolve Row/Insert types. */
+  Relationships: [];
 }
 
 /** The generic Database type @supabase/supabase-js is parameterized over. */
@@ -111,6 +157,8 @@ export interface Database {
       income_sources: TableShape<IncomeSourceRow>;
       fixed_expenses: TableShape<FixedExpenseRow>;
       variable_expenses: TableShape<VariableExpenseRow>;
+      financial_assets: TableShape<FinancialAssetRow>;
+      user_preferences: TableShape<UserPreferencesRow>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
