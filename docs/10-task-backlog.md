@@ -261,6 +261,8 @@ This backlog's milestone numbering is **one-to-one** with the roadmap's "roadmap
 ## M5 — Assets + crypto calculator + multi-currency + market-data Edge Function
 
 > **Goal:** Assets/investments with transactions, the BTC/crypto calculator converting fiat↔sats using **server-side** market data via the `market-data` Supabase Edge Function (provider keys stay server-side), and app-wide multi-currency display. (See: [`./05-data-model.md`](./05-data-model.md), [`./07-security-and-privacy.md`](./07-security-and-privacy.md).)
+>
+> **Status note (2026-06-28):** M5 has **shipped on both clients** (using **sample** exchange rates — live `market-data` wiring is the remaining piece). Shared core: `FinancialAsset`/`AssetTransaction` + average-cost valuation (ADR-0015: unrealized gain/loss, portfolio value/cost/gain, allocation distribution) and BTC↔fiat math, in Swift `Domain` (`Assets.swift`) and web `core/assets.ts`, unit-tested with matching vectors (portfolio €27,250 / +€5,250; +25%/+20%/−10% holdings; cross-currency totals; €500→1,000,000 sats). UI: an **Assets** screen (portfolio header, allocation donut, holdings + gain/loss), a **BTC Calculator**, and an EUR/USD/BTC display-currency switcher, under a **More** hub on iOS (`AssetsView`/`CalculatorView`/`MoreView`) and web (`Assets.tsx`/`Calculator.tsx`/`More.tsx`). The `financial_assets` / `asset_transactions` / `currency_preferences` migrations already exist from the backend pass. **Still open:** the live `market-data` Edge Function client wiring (`M5-BACK-*`, `M5-CALC-02` live rate), the real Supabase-backed `AssetRepository` (`M5-DATA-03`, in-memory today), add/edit + transaction entry (`M5-ASSET-02`), and threading display-currency through *all* analytics views (`M5-CUR-03`).
 
 ### M5-DATA — Assets schema
 
@@ -271,17 +273,17 @@ This backlog's milestone numbering is **one-to-one** with the roadmap's "roadmap
 
 ### M5-ASSET — Assets feature
 
-- [ ] **M5-ASSET-01** — Asset list + detail showing average-cost basis, current value, unrealized gain/loss (pure, tested math per ADR-0015). (dep: M5-DATA-03, M1-DOMAIN-01)
+- [x] **M5-ASSET-01** — Asset list + detail showing average-cost basis, current value, unrealized gain/loss (pure, tested math per ADR-0015). (dep: M5-DATA-03, M1-DOMAIN-01) — *shipped both clients over an in-memory repo; `AssetValuation`/`assets.ts` math unit-tested (the real Supabase `AssetRepository` is M5-DATA-03).*
 - [ ] **M5-ASSET-02** — Add/edit asset + record transactions (buy/sell/dividend/other) with fees; recompute holdings under average-cost basis. (dep: M5-ASSET-01)
-- [ ] **M5-ASSET-03** — Portfolio summary chart (allocation by type) via Swift Charts. (dep: M5-ASSET-01, M1-DS-03)
+- [x] **M5-ASSET-03** — Portfolio summary chart (allocation by type) via Swift Charts. (dep: M5-ASSET-01, M1-DS-03) — *shipped: Swift Charts allocation donut on iOS, inline-SVG donut on web.*
 
 ### M5-BACK / M5-CALC — Edge Function & crypto calculator
 
 - [ ] **M5-BACK-01** — Complete the **`market-data` Edge Function** (from the M0 stub): fetch fiat FX + BTC spot from a public provider using a **server-side** API key from the Edge Function environment; cache; return normalized rates. No provider key ever reaches the client. (dep: M0-BACK-06, see: [`./07-security-and-privacy.md`](./07-security-and-privacy.md), [`./11-substimate-analysis.md`](./11-substimate-analysis.md), [`./12-decisions-adr.md`](./12-decisions-adr.md) — ADR-0010)
 - [ ] **M5-BACK-02** — Add caching/rate-limiting in the Edge Function and an auth check so only `authenticated` callers may invoke it. (dep: M5-BACK-01)
 - [ ] **M5-BACK-03** — Edge Function tests + local `supabase functions serve` instructions in the function's README. (dep: M5-BACK-01)
-- [ ] **M5-CALC-01** — Implement the **BTC↔fiat conversion math** in `Domain` using `satsPerBTC` (100,000,000), integer-safe, unit-tested. (dep: M1-DOMAIN-01)
-- [ ] **M5-CALC-02** — Build the **calculator UI**: enter fiat → see sats/BTC and vice-versa, with the live rate fetched via the `market-data` Edge Function (with a cached fallback + "last updated" timestamp). (dep: M5-CALC-01, M5-BACK-01)
+- [x] **M5-CALC-01** — Implement the **BTC↔fiat conversion math** in `Domain` using `satsPerBTC` (100,000,000), integer-safe, unit-tested. (dep: M1-DOMAIN-01) — *shipped both clients (`CryptoCalculator` / `assets.ts`), €500→1,000,000 sats vector tested.*
+- [~] **M5-CALC-02** — Build the **calculator UI**: enter fiat → see sats/BTC and vice-versa, with the live rate fetched via the `market-data` Edge Function (with a cached fallback + "last updated" timestamp). (dep: M5-CALC-01, M5-BACK-01) — *calculator UI shipped on both clients over **sample** rates; the live `market-data` Edge Function fetch + "last updated"/cached fallback remain (dep: M5-BACK-01).*
 - [ ] **M5-CALC-03** — Calculator store tests with a mocked rate provider. (dep: M5-CALC-02, M1-TEST-03)
 
 ### M5-CUR — Multi-currency

@@ -22,7 +22,7 @@ struct RootView: View {
                 .tabItem { Label("Cash Flow", systemImage: "chart.line.uptrend.xyaxis") }
             CalendarView()
                 .tabItem { Label("Calendar", systemImage: "calendar") }
-            PlaceholderView(title: "More", symbol: "ellipsis.circle")
+            MoreView()
                 .tabItem { Label("More", systemImage: "ellipsis.circle.fill") }
         }
     }
