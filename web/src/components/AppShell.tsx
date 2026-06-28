@@ -32,6 +32,7 @@ export function AppShell() {
             key={s.to}
             to={s.to}
             end={s.to === '/'}
+            data-testid={`nav-${s.to === '/' ? 'home' : s.to.replace(/^\//, '')}`}
             className={({ isActive }) => `fm-nav-link${isActive ? ' active' : ''}`}
           >
             <span className="fm-nav-icon" aria-hidden="true">

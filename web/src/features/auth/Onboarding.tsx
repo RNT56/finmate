@@ -58,6 +58,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             type="button"
             className="fm-btn"
             style={{ width: '100%', justifyContent: 'center', marginTop: '1.75rem' }}
+            data-testid="onboarding-continue"
             onClick={onComplete}
           >
             Get started →

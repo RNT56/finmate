@@ -14,6 +14,10 @@ export default defineConfig({
     // test files opt into jsdom with a `// @vitest-environment jsdom` file directive.
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // Playwright E2E specs live under e2e/ and use a different runner; keep them
+    // out of Vitest entirely (the include above already scopes to src/, this is
+    // belt-and-suspenders so the two suites never collide).
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
     setupFiles: ['src/test/setup.ts'],
     coverage: {
       provider: 'v8',

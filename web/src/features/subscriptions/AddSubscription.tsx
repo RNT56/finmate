@@ -91,6 +91,7 @@ export function AddSubscription({ onSave, onClose }: Props) {
               <input
                 id="sub-name"
                 className="fm-input"
+                data-testid="subscription-name"
                 value={name}
                 autoFocus
                 onChange={(e) => setName(e.target.value)}
@@ -111,6 +112,7 @@ export function AddSubscription({ onSave, onClose }: Props) {
               <input
                 id="sub-amount"
                 className="fm-input"
+                data-testid="subscription-amount"
                 inputMode="decimal"
                 placeholder="12.99"
                 value={amount}
@@ -141,7 +143,7 @@ export function AddSubscription({ onSave, onClose }: Props) {
               <button type="button" className="fm-btn fm-btn-ghost" onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className="fm-btn">
+              <button type="submit" className="fm-btn" data-testid="subscription-save">
                 Save
               </button>
             </div>
