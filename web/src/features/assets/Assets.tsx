@@ -33,6 +33,8 @@ const TYPE_COLOR: Record<AssetType, string> = {
   stock: 'var(--fm-accent)',
   etf: 'var(--fm-flow-violet)',
   cash: 'var(--fm-up)',
+  savings: 'var(--fm-warning)',
+  real_estate: 'var(--fm-down)',
   other: 'var(--fm-neutral)',
 };
 

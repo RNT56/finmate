@@ -602,7 +602,7 @@ CREATE TRIGGER set_income_sources_updated_at
 
 ### 3.5 `fixed_expenses`
 
-Substimate had both `due_date` and `dueDate`. Finmate keeps a single `due_date date`, normalizes `category` → `category_id` FK, adds `currency`, and constrains `amount_minor`.
+Substimate had both `due_date` and `dueDate`. Finmate keeps a single `due_date date`, normalizes `category` → `category_id` FK, adds `currency`, and constrains `amount_minor`. The `frequency` `CHECK` includes `weekly` to match the Domain `BillingPeriod` (and `income_sources.frequency`), widened by migration `20260628001000_reconcile_enums.sql` ([ADR-0023](./12-decisions-adr.md#adr-0023--reconcile-asset_type-union-set--fixed_expenses-weekly-frequency-to-the-schema)).
 
 ```swift
 public struct FixedExpense: Identifiable, Codable, Hashable, Sendable {
@@ -629,7 +629,7 @@ CREATE TABLE public.fixed_expenses (
   currency     text   NOT NULL DEFAULT 'EUR' CHECK (currency IN ('EUR','USD','BTC')),
   category_id  uuid REFERENCES public.categories(id) ON DELETE SET NULL,
   due_date     date,
-  frequency    text NOT NULL CHECK (frequency IN ('monthly','quarterly','yearly')),
+  frequency    text NOT NULL CHECK (frequency IN ('weekly','monthly','quarterly','yearly')),
   autopay      boolean NOT NULL DEFAULT false,
   notes        text,
   created_at   timestamptz NOT NULL DEFAULT now(),
@@ -720,7 +720,7 @@ CREATE TRIGGER set_variable_expenses_updated_at
 
 ### 3.7 `financial_assets`
 
-Substimate stored asset money as `numeric(20,2)` (no BTC sat precision) and `quantity numeric(20,8)`. Finmate stores monetary fields as `bigint` minor units in the asset's `currency` and keeps `quantity numeric(38,8)` (quantity is a count of units/shares/coins, not money — `numeric` is correct here). `last_updated` is folded into the standard `updated_at`.
+Substimate stored asset money as `numeric(20,2)` (no BTC sat precision) and `quantity numeric(20,8)`. Finmate stores monetary fields as `bigint` minor units in the asset's `currency` and keeps `quantity numeric(38,8)` (quantity is a count of units/shares/coins, not money — `numeric` is correct here). `last_updated` is folded into the standard `updated_at`. The `asset_type` `CHECK` is the canonical **union** set `{crypto, stock, etf, cash, savings, real_estate, other}` — identical to the Domain `AssetType`, so the DTO maps losslessly 1:1 — widened by migration `20260628001000_reconcile_enums.sql` ([ADR-0023](./12-decisions-adr.md#adr-0023--reconcile-asset_type-union-set--fixed_expenses-weekly-frequency-to-the-schema)).
 
 **Cost-basis semantics (pinned, v1 = average-cost; FIFO deferred per ADR-0015):**
 
@@ -755,7 +755,7 @@ CREATE TABLE public.financial_assets (
   user_id              uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name                 text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 120),
   asset_type           text NOT NULL
-                         CHECK (asset_type IN ('stock','crypto','savings','real_estate','other')),
+                         CHECK (asset_type IN ('crypto','stock','etf','cash','savings','real_estate','other')),
   currency             text NOT NULL DEFAULT 'EUR' CHECK (currency IN ('EUR','USD','BTC')),
   value_minor          bigint NOT NULL CHECK (value_minor >= 0),
   quantity             numeric(38,8),

@@ -98,10 +98,17 @@ export type VariableExpenseRow = {
 
 /**
  * The asset classes the Postgres `financial_assets.asset_type` CHECK allows
- * (docs/05 §3.7). Note these differ from the Domain `AssetType` (`etf`/`cash`):
- * the repository mapper translates between the two vocabularies.
+ * (docs/05 §3.7; ADR-0023). The schema CHECK now matches the Domain `AssetType`
+ * exactly — the canonical union — so the repository mapper round-trips 1:1.
  */
-export type AssetTypeRow = 'stock' | 'crypto' | 'savings' | 'real_estate' | 'other';
+export type AssetTypeRow =
+  | 'crypto'
+  | 'stock'
+  | 'etf'
+  | 'cash'
+  | 'savings'
+  | 'real_estate'
+  | 'other';
 
 /** docs/05 §3.7 financial_assets (average-cost semantics). */
 export type FinancialAssetRow = {

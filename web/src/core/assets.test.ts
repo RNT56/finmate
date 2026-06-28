@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  type AssetType,
   type FinancialAsset,
+  allAssetTypes,
+  assetTypeLabel,
   unrealizedGainMinor,
   gainPct,
   portfolioValueMinor,
@@ -64,6 +67,35 @@ const SAMPLE_RATES: ExchangeRates = {
   fetchedAt: 0,
 };
 const eurConverter = new CurrencyConverter(SAMPLE_RATES);
+
+describe('AssetType vocabulary (ADR-0023: canonical union, mirrors Swift)', () => {
+  it('enumerates all 7 canonical asset types', () => {
+    expect(allAssetTypes).toEqual([
+      'crypto',
+      'stock',
+      'etf',
+      'cash',
+      'savings',
+      'real_estate',
+      'other',
+    ]);
+  });
+
+  it('maps every type to a human label (incl. Savings / Real estate)', () => {
+    const labels: Record<AssetType, string> = {
+      crypto: 'Crypto',
+      stock: 'Stock',
+      etf: 'ETF',
+      cash: 'Cash',
+      savings: 'Savings',
+      real_estate: 'Real estate',
+      other: 'Other',
+    };
+    for (const t of allAssetTypes) {
+      expect(assetTypeLabel(t)).toBe(labels[t]);
+    }
+  });
+});
 
 describe('unrealizedGainMinor / gainPct', () => {
   it('Bitcoin +500_000 (+25%)', () => {

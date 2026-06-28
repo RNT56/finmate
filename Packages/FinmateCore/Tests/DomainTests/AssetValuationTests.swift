@@ -165,4 +165,29 @@ import Foundation
         #expect(h.costBasisMinor == 0)
         #expect(h.valueMinor == 0)
     }
+
+    // MARK: AssetType canonical union set (ADR-0023, migration 20260628001000)
+
+    @Test func assetTypeCanonicalUnionSet() throws {
+        // The schema CHECK and the Domain enum agree on these 7 raw values.
+        #expect(AssetType.allCases.count == 7)
+        let raws = Set(AssetType.allCases.map(\.rawValue))
+        #expect(raws == ["crypto", "stock", "etf", "cash", "savings", "real_estate", "other"])
+        // The only camelCase↔snake_case rename is realEstate → "real_estate".
+        #expect(AssetType.realEstate.rawValue == "real_estate")
+        #expect(AssetType.savings.rawValue == "savings")
+    }
+
+    @Test func assetTypeCodableRoundTrip() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        for type in AssetType.allCases {
+            let data = try encoder.encode(type)
+            let decoded = try decoder.decode(AssetType.self, from: data)
+            #expect(decoded == type)
+        }
+        // "real_estate" decodes to the realEstate case (schema column round-trip).
+        let fromColumn = try decoder.decode(AssetType.self, from: Data("\"real_estate\"".utf8))
+        #expect(fromColumn == .realEstate)
+    }
 }
