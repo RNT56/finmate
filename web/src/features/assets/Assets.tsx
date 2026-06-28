@@ -24,6 +24,7 @@ import {
 import { useAssets } from './useAssets';
 import { AssetModal } from './AssetModal';
 import { TransactionModal } from './TransactionModal';
+import { usePreferences } from '../settings/usePreferences';
 
 const DISPLAY_CURRENCIES: CurrencyCode[] = ['EUR', 'USD', 'BTC'];
 
@@ -39,7 +40,12 @@ const TYPE_COLOR: Record<AssetType, string> = {
 };
 
 export function Assets() {
-  const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('EUR');
+  // Default the display currency from the app-wide preference (Settings). The local
+  // EUR/USD/BTC switcher still lets the user explore other currencies ad-hoc.
+  const { preferences } = usePreferences();
+  const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>(
+    preferences.defaultCurrency
+  );
   const {
     loading,
     error,

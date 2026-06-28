@@ -93,14 +93,17 @@ final class AssetsStore {
     private(set) var loadError: String?
     private(set) var hasLoaded = false
     /// Display currency switcher (EUR/USD/BTC) — reconverts totals non-mutatingly.
-    var displayCurrency: CurrencyCode = .eur
+    /// Seeded from the app-wide Settings default; the inline segmented switcher is a
+    /// local per-screen override.
+    var displayCurrency: CurrencyCode
 
     private let repository: AssetRepository
     let converter: CurrencyConverter
 
-    init(repository: AssetRepository, rates: ExchangeRates) {
+    init(repository: AssetRepository, rates: ExchangeRates, displayCurrency: CurrencyCode = .eur) {
         self.repository = repository
         self.converter = CurrencyConverter(rates: rates)
+        self.displayCurrency = displayCurrency
     }
 
     func load() async {
@@ -206,6 +209,7 @@ enum AssetPalette {
 
 struct AssetsView: View {
     @Environment(\.repositories) private var repositories
+    @Environment(PreferencesStore.self) private var preferences
     @State private var store = AssetsStore(
         repository: AssetsSampleData.repository, rates: AssetsSampleData.sampleRates)
     @State private var didBind = false
@@ -261,7 +265,8 @@ struct AssetsView: View {
                 // Display rates come from the injected ExchangeRateProvider (live
                 // market-data Edge Function or sample), falling back to the sample set.
                 let rates = (try? await repositories.exchangeRates.latestRates()) ?? AssetsSampleData.sampleRates
-                store = AssetsStore(repository: repositories.assets, rates: rates)
+                store = AssetsStore(repository: repositories.assets, rates: rates,
+                                    displayCurrency: preferences.preferences.defaultCurrency)
                 didBind = true
             }
             await store.load()

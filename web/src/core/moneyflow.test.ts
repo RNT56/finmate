@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   layout,
+  makeMoneyFlow,
   ribbonPath,
   savingsMinor,
   totalExpensesMinor,
   BUCKET_ORDER,
   type MoneyFlow,
 } from './moneyflow';
+import { CurrencyConverter, type ExchangeRates } from './currency';
+import type { FixedExpenseItem, IncomeItem, VariableExpenseItem } from './cashflow';
 
 // Mirrors the Swift MoneyFlowLayoutTests vectors (docs/13 §6.5, docs/14 §11, ADR-0016).
 // Canonical sample flow shared with the Cash Flow KPIs:
@@ -153,5 +156,36 @@ describe('layout() — income with no expenses (all saved)', () => {
     expect(buckets[0].id).toBe('savings');
     expect(result.links).toHaveLength(1);
     expect(result.links[0].id).toBe('savings');
+  });
+});
+
+// MARK: makeMoneyFlow — mixed-currency, converted to a display currency (docs/13 §6.5/§7).
+// Mirrors Swift CashFlowTests.mixedCurrencyMoneyFlowBucketsConvert with the SAME vectors.
+// Sample rates: eurUsd 1.10 (USD per EUR), btcEur 50_000, btcUsd 55_000.
+describe('makeMoneyFlow (converter-aware)', () => {
+  const SAMPLE_RATES: ExchangeRates = {
+    eurUsd: 1.1,
+    btcEur: 50_000,
+    btcUsd: 55_000,
+    fetchedAt: 0,
+  };
+  const converter = new CurrencyConverter(SAMPLE_RATES);
+
+  it('converts each income/fixed/variable bucket before summing', () => {
+    const income: IncomeItem[] = [
+      { amountMinor: 300_000, currency: 'EUR', frequency: 'monthly' },
+      { amountMinor: 110_000, currency: 'USD', frequency: 'monthly' },
+    ];
+    const fixed: FixedExpenseItem[] = [
+      { amountMinor: 110_000, currency: 'EUR', billingPeriod: 'monthly' },
+    ];
+    const variable: VariableExpenseItem[] = [{ amountMinor: 11_000, currency: 'USD' }];
+    const flow = makeMoneyFlow(income, fixed, variable, 5_000, 'EUR', converter);
+    expect(flow.incomeMinor).toBe(400_000); // €4000
+    expect(flow.fixedMinor).toBe(110_000); // €1100
+    expect(flow.variableMinor).toBe(10_000); // $110 → €100
+    expect(flow.subscriptionsMinor).toBe(5_000);
+    // savings = 400000 − (110000 + 10000 + 5000) = 275000.
+    expect(savingsMinor(flow)).toBe(275_000);
   });
 });

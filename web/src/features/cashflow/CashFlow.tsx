@@ -17,8 +17,6 @@ import { fixedMonthlyAmountMinor } from './types';
 import type { FixedExpense, IncomeSource, VariableExpense } from './types';
 import type { EntityKind } from './entityForm';
 
-const EUR_LOCALE = 'de-DE';
-
 type Entity = IncomeSource | FixedExpense | VariableExpense;
 type ModalState = { kind: EntityKind; existing: Entity | null } | null;
 
@@ -48,8 +46,7 @@ export function CashFlow() {
 
   const [modal, setModal] = useState<ModalState>(null);
 
-  const fmt = (minor: number) =>
-    formatMoney(minor, displayCurrency, EUR_LOCALE);
+  const fmt = (minor: number) => formatMoney(minor, displayCurrency);
   const savingsPct = (metrics.savingsRate * 100).toFixed(1);
   const netPositive = metrics.netMinor >= 0;
 

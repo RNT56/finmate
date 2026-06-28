@@ -20,14 +20,14 @@ struct AnalyticsSlice: Identifiable {
 
 enum SubscriptionAnalytics {
     /// Group subscriptions by inferred category, summing normalized **monthly** minor
-    /// units, then run the Domain distribution aggregator. Filters to a single
-    /// currency (the displayed one) so totals are meaningful without conversion.
-    static func slices(for subscriptions: [Subscription], currency: CurrencyCode) -> [AnalyticsSlice] {
-        let rows = subscriptions
-            .filter { $0.currency == currency }
-            .map { (category: SubscriptionPredictor.inferCategory(name: $0.name),
-                    amountMinor: $0.monthlyAmount.minorUnits) }
-        return Analytics.categoryDistribution(rows).map {
+    /// units converted to `currency` per item via the Domain aggregator (docs/13
+    /// §5.1/§7). Display-only conversion — stored amounts are never mutated.
+    static func slices(for subscriptions: [Subscription], currency: CurrencyCode,
+                       converter: CurrencyConverter) -> [AnalyticsSlice] {
+        let rows: [(category: String, amount: Money)] = subscriptions.map {
+            (category: SubscriptionPredictor.inferCategory(name: $0.name), amount: $0.monthlyAmount)
+        }
+        return Analytics.categoryDistribution(rows, displayCurrency: currency, converter: converter).map {
             AnalyticsSlice(category: $0.category, monthlyMinor: $0.totalMinor,
                            share: $0.share, count: $0.count)
         }
@@ -36,10 +36,11 @@ enum SubscriptionAnalytics {
 
 struct SubscriptionAnalyticsView: View {
     let subscriptions: [Subscription]
-    private let displayCurrency: CurrencyCode = .eur
+    var displayCurrency: CurrencyCode = .eur
+    var converter: CurrencyConverter = CurrencyConverter(rates: AssetsSampleData.sampleRates)
 
     private var slices: [AnalyticsSlice] {
-        SubscriptionAnalytics.slices(for: subscriptions, currency: displayCurrency)
+        SubscriptionAnalytics.slices(for: subscriptions, currency: displayCurrency, converter: converter)
     }
 
     private var totalMonthly: Money {

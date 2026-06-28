@@ -2,11 +2,11 @@
 // Talks to repository protocols only; subscriptions roll-up reuses the M1 store.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { CurrencyCode } from '../../core/currency';
+import { CurrencyConverter, type CurrencyCode } from '../../core/currency';
 import {
-  cashFlowMetrics,
-  monthlyExpensesMinor,
-  monthlyIncomeMinor,
+  cashFlowMetricsIn,
+  fixedMonthlyMinorIn,
+  variableThisMonthMinorIn,
   type CashFlowMetrics,
 } from '../../core/cashflow';
 import type {
@@ -16,10 +16,12 @@ import type {
   IncomeSource,
   VariableExpense,
 } from './types';
-import { categoryNameFor, fixedMonthlyAmountMinor } from './types';
+import { categoryNameFor } from './types';
 import { InMemoryCashFlowRepository } from './repository';
 import { getRepositories } from '../../lib/repositories';
 import { useSubscriptions } from '../subscriptions/useSubscriptions';
+import { usePreferences } from '../settings/usePreferences';
+import { APP_RATES } from '../../lib/rates';
 
 export interface ExpenseBreakdownRow {
   label: string;
@@ -54,8 +56,6 @@ export interface UseCashFlow {
   removeVariable: (id: string) => Promise<void>;
 }
 
-const DISPLAY_CURRENCY: CurrencyCode = 'EUR';
-
 export function useCashFlow(
   repository: CashFlowRepository = getRepositories().cashFlow
 ): UseCashFlow {
@@ -70,13 +70,19 @@ export function useCashFlow(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Subscriptions monthly roll-up comes from the shared M1 store (same sample data).
+  // App-wide display currency is the single source of truth in Settings (docs/02 §12).
+  const { preferences } = usePreferences();
+  const displayCurrency = preferences.defaultCurrency;
+  const converter = useMemo(() => new CurrencyConverter(APP_RATES), []);
+
+  // Subscriptions monthly roll-up comes from the shared M1 store (same sample data),
+  // converted to the SAME display currency so the breakdown/expenses agree.
   const {
     monthlyTotalMinor,
     loading: subsLoading,
     error: subsError,
   } = useSubscriptions();
-  const subscriptionsMinor = monthlyTotalMinor(DISPLAY_CURRENCY);
+  const subscriptionsMinor = monthlyTotalMinor(displayCurrency);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,35 +152,58 @@ export function useCashFlow(
     [repository, load]
   );
 
+  // Every roll-up converts each item to the display currency at READ time before
+  // summing (docs/13 §6/§7) — stored amounts are never mutated. This both expresses
+  // the figures in the display currency AND correctly sums mixed-currency inputs.
   const fixedMinor = useMemo(
-    () => fixedExpenses.reduce((sum, e) => sum + fixedMonthlyAmountMinor(e), 0),
-    [fixedExpenses]
+    () =>
+      fixedMonthlyMinorIn(
+        fixedExpenses.map((e) => ({
+          amountMinor: e.amountMinor,
+          currency: e.currency,
+          billingPeriod: e.billingPeriod,
+        })),
+        displayCurrency,
+        converter
+      ),
+    [fixedExpenses, displayCurrency, converter]
   );
 
   const variableMinor = useMemo(
-    () => variableExpenses.reduce((sum, e) => sum + e.amountMinor, 0),
-    [variableExpenses]
-  );
-
-  const incomeMinor = useMemo(
     () =>
-      monthlyIncomeMinor(
-        incomes.map((i) => ({
-          amountMinor: i.amountMinor,
-          frequency: i.frequency,
-        }))
+      variableThisMonthMinorIn(
+        variableExpenses.map((e) => ({
+          amountMinor: e.amountMinor,
+          currency: e.currency,
+        })),
+        displayCurrency,
+        converter
       ),
-    [incomes]
-  );
-
-  const expenseMinor = useMemo(
-    () => monthlyExpensesMinor(fixedMinor, variableMinor, subscriptionsMinor),
-    [fixedMinor, variableMinor, subscriptionsMinor]
+    [variableExpenses, displayCurrency, converter]
   );
 
   const metrics = useMemo(
-    () => cashFlowMetrics(incomeMinor, expenseMinor),
-    [incomeMinor, expenseMinor]
+    () =>
+      cashFlowMetricsIn(
+        incomes.map((i) => ({
+          amountMinor: i.amountMinor,
+          currency: i.currency,
+          frequency: i.frequency,
+        })),
+        fixedExpenses.map((e) => ({
+          amountMinor: e.amountMinor,
+          currency: e.currency,
+          billingPeriod: e.billingPeriod,
+        })),
+        variableExpenses.map((e) => ({
+          amountMinor: e.amountMinor,
+          currency: e.currency,
+        })),
+        subscriptionsMinor,
+        displayCurrency,
+        converter
+      ),
+    [incomes, fixedExpenses, variableExpenses, subscriptionsMinor, displayCurrency, converter]
   );
 
   const categoryName = useCallback(
@@ -208,7 +237,7 @@ export function useCashFlow(
     breakdown,
     expenseCategories,
     categoryName,
-    displayCurrency: DISPLAY_CURRENCY,
+    displayCurrency,
     addIncome,
     removeIncome,
     addFixed,

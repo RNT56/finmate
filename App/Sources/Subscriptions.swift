@@ -108,10 +108,12 @@ final class SubscriptionsStore {
 
 struct SubscriptionsListView: View {
     @Environment(\.repositories) private var repositories
+    @Environment(PreferencesStore.self) private var preferences
     @State private var store = SubscriptionsStore(repository: SampleData.repository)
     @State private var didBind = false
     @State private var showingAdd = false
     @State private var showingAnalytics = false
+    @State private var converter = CurrencyConverter(rates: AssetsSampleData.sampleRates)
 
     var body: some View {
         NavigationStack {
@@ -161,7 +163,10 @@ struct SubscriptionsListView: View {
             }
             .sheet(isPresented: $showingAnalytics) {
                 NavigationStack {
-                    SubscriptionAnalyticsView(subscriptions: store.subscriptions)
+                    SubscriptionAnalyticsView(
+                        subscriptions: store.subscriptions,
+                        displayCurrency: preferences.preferences.defaultCurrency,
+                        converter: converter)
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) {
                                 Button("Done") { showingAnalytics = false }
@@ -172,6 +177,9 @@ struct SubscriptionsListView: View {
             .task {
                 if !didBind {
                     store = SubscriptionsStore(repository: repositories.subscriptions)
+                    if let rates = try? await repositories.exchangeRates.latestRates() {
+                        converter = CurrencyConverter(rates: rates)
+                    }
                     didBind = true
                 }
                 await store.load()
