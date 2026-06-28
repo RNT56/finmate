@@ -9,9 +9,15 @@
 import { normalizeNumberString } from './predictor';
 import { parseMoney, MoneyError } from './money';
 import type { CurrencyCode } from './currency';
-import type { BillingPeriod } from './normalization';
+import type { BillingPeriod, IncomeFrequency } from './normalization';
 import type { PaymentMethod, UsageState } from '../types/database';
 import type { Subscription } from '../features/subscriptions/types';
+import type {
+  ExpenseCategory,
+  FixedExpense,
+  IncomeSource,
+  VariableExpense,
+} from '../features/cashflow/types';
 
 export interface ImportRowError {
   /** 1-based row number in the data body (header is not counted). */
@@ -171,6 +177,81 @@ function isValidISODate(value: string): boolean {
   if (m < 1 || m > 12 || d < 1 || d > 31) return false;
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+// MARK: - Shared field parsers (mirrors the Swift `CSVImportKit` helpers).
+
+/** Parse a currency cell. Blank → EUR default (no error). Unknown → EUR + error. */
+function parseCurrencyCell(
+  raw: string,
+  row: number,
+  errors: ImportRowError[]
+): CurrencyCode {
+  if (raw.length === 0) return 'EUR';
+  const upper = raw.toUpperCase();
+  if (CURRENCIES.includes(upper as CurrencyCode)) return upper as CurrencyCode;
+  errors.push({ row, field: 'currency', message: 'Unsupported currency' });
+  return 'EUR';
+}
+
+/** Parse a required amount cell into minor units for `currency` (HALF-UP). Blank or
+ *  unparseable → 0 with an "Invalid amount" error. */
+function parseAmountCell(
+  raw: string,
+  currency: CurrencyCode,
+  row: number,
+  errors: ImportRowError[]
+): number {
+  if (raw.length === 0) {
+    errors.push({ row, field: 'amount', message: 'Invalid amount' });
+    return 0;
+  }
+  try {
+    return parseMoney(normalizeNumberString(raw), currency);
+  } catch (err) {
+    // Keep a stable message regardless of MoneyError kind (mirrors iOS).
+    void (err instanceof MoneyError);
+    errors.push({ row, field: 'amount', message: 'Invalid amount' });
+    return 0;
+  }
+}
+
+/** Parse a loose boolean cell: true/yes/1/y/on → true; false/no/0/n/off → false;
+ *  blank → null (caller's default). Anything else → null + error. */
+function parseBoolCell(
+  raw: string,
+  field: string,
+  row: number,
+  errors: ImportRowError[]
+): boolean | null {
+  const v = raw.trim().toLowerCase();
+  if (v.length === 0) return null;
+  if (['true', 'yes', '1', 'y', 'on'].includes(v)) return true;
+  if (['false', 'no', '0', 'n', 'off'].includes(v)) return false;
+  errors.push({ row, field, message: 'Invalid boolean (expected true/false)' });
+  return null;
+}
+
+/** Resolve a category NAME to an existing expense category id (case-insensitive,
+ *  trimmed). Blank or no match → null (Uncategorized). Never an error. */
+function resolveCategoryID(
+  name: string,
+  categories: ExpenseCategory[]
+): string | null {
+  const needle = name.trim().toLowerCase();
+  if (needle.length === 0) return null;
+  return categories.find((c) => c.name.toLowerCase() === needle)?.id ?? null;
+}
+
+const NAME_MAX = 120;
+
+/** Validate a required name cell (1..120 chars). */
+function validateName(name: string, row: number, errors: ImportRowError[]): void {
+  if (name.length === 0) {
+    errors.push({ row, field: 'name', message: 'Missing name' });
+  } else if (name.length > NAME_MAX) {
+    errors.push({ row, field: 'name', message: 'Name too long (max 120 characters)' });
+  }
 }
 
 /** The canonical, mappable target fields (mirrors the Swift `CSVField`). */
@@ -432,3 +513,356 @@ export const SAMPLE_CSV = `name,monthly_cost,currency,billing_period,payment_met
 Netflix,12.99,EUR,monthly,credit_card,Streaming
 GitHub,"100,00",USD,yearly,paypal,Developer
 Figma,abc,USD,monthly,credit_card,Design`;
+
+// ===========================================================================
+// MARK: - Generalized entity importers (income + fixed/variable expenses)
+//
+// Mirrors the Swift `CSVImportKit` + `EntityCSVImporters`: one tokenizer, alias
+// auto-mapping, a generic explicit-mapping row loop collecting ALL per-row errors,
+// and per-type field specs + builders. Reuses the same tokenizer / number-parser /
+// validation helpers above — nothing about the RFC-4180 tokenizer is duplicated.
+// ===========================================================================
+
+/** A previewable result over any entity (mirrors the Swift `EntityImportPreview`). */
+export interface EntityImportPreview<Entity> {
+  valid: Entity[];
+  errors: ImportRowError[];
+  totalRows: number;
+}
+
+/** Per-field column index for an arbitrary field enum. */
+export type FieldMapping<Field extends string> = Partial<Record<Field, number>>;
+
+/** Header analysis for an arbitrary field enum. */
+export interface EntityHeaderAnalysis<Field extends string> {
+  headers: string[];
+  autoMapping: FieldMapping<Field>;
+}
+
+type AliasMap<Field extends string> = Partial<Record<Field, readonly string[]>>;
+
+/** Build the alias auto-mapping for a tokenized header using a per-field alias set.
+ *  First alias match wins per field; first column wins on duplicate aliases. */
+function autoDetectMappingFor<Field extends string>(
+  header: string[],
+  aliases: AliasMap<Field>
+): FieldMapping<Field> {
+  const mapping: FieldMapping<Field> = {};
+  header.forEach((raw, idx) => {
+    const token = snake(raw);
+    (Object.keys(aliases) as Field[]).forEach((field) => {
+      const set = aliases[field];
+      if (set && set.includes(token) && mapping[field] === undefined) {
+        mapping[field] = idx;
+      }
+    });
+  });
+  return mapping;
+}
+
+/** Inspect a CSV header with a per-field alias set: raw tokens + the auto-mapping. */
+function analyzeHeaderFor<Field extends string>(
+  text: string,
+  aliases: AliasMap<Field>
+): EntityHeaderAnalysis<Field> {
+  const rows = tokenizeCSV(text);
+  const nonEmpty = rows.filter((r) => !(r.length === 1 && r[0].trim() === ''));
+  if (nonEmpty.length === 0) return { headers: [], autoMapping: {} };
+  const headers = nonEmpty[0].map((h) => h.trim());
+  return { headers, autoMapping: autoDetectMappingFor(nonEmpty[0], aliases) };
+}
+
+type RowResult<Entity> = { ok: true; entity: Entity } | { ok: false; errors: ImportRowError[] };
+
+/** Generic explicit-mapping row loop. Header is row 1; data rows start at row 2.
+ *  Wholly-blank rows are skipped. Delegates per-row construction to `build`. */
+function parseEntityCSV<Field extends string, Entity>(
+  text: string,
+  mapping: FieldMapping<Field>,
+  build: (cell: (key: Field) => string, rowNumber: number) => RowResult<Entity>
+): EntityImportPreview<Entity> {
+  const rows = tokenizeCSV(text);
+  const nonEmpty = rows.filter((r) => !(r.length === 1 && r[0].trim() === ''));
+  if (nonEmpty.length === 0) return { valid: [], errors: [], totalRows: 0 };
+
+  const dataRows = nonEmpty.slice(1);
+  const valid: Entity[] = [];
+  const errors: ImportRowError[] = [];
+  let totalRows = 0;
+
+  dataRows.forEach((cols, i) => {
+    const isBlank = cols.every((c) => c.trim() === '');
+    if (isBlank) return;
+    totalRows += 1;
+    const rowNumber = i + 2; // header is row 1
+    const cell = (key: Field): string => {
+      const idx = mapping[key];
+      if (idx === undefined || idx < 0 || idx >= cols.length) return '';
+      return (cols[idx] ?? '').trim();
+    };
+    const result = build(cell, rowNumber);
+    if (result.ok) valid.push(result.entity);
+    else errors.push(...result.errors);
+  });
+
+  return { valid, errors, totalRows };
+}
+
+const importId = (prefix: string, row: number): string =>
+  `${prefix}-${Date.now()}-${row}`;
+
+// MARK: - Income (IncomeSource)
+
+export type IncomeCSVField = 'name' | 'amount' | 'currency' | 'frequency' | 'next_payment' | 'notes';
+
+export const INCOME_CSV_FIELDS: readonly IncomeCSVField[] = [
+  'name',
+  'amount',
+  'currency',
+  'frequency',
+  'next_payment',
+  'notes',
+];
+
+const INCOME_FREQUENCIES: readonly IncomeFrequency[] = ['weekly', 'monthly', 'yearly', 'one_time'];
+
+const INCOME_ALIASES: AliasMap<IncomeCSVField> = {
+  name: ['name', 'source', 'title', 'income'],
+  amount: ['amount', 'pay', 'salary', 'income_amount', 'monthly_amount'],
+  currency: ['currency', 'ccy'],
+  frequency: ['frequency', 'freq', 'period', 'cycle'],
+  next_payment: ['next_payment', 'next', 'payday', 'next_pay', 'date'],
+  notes: ['notes', 'note', 'memo', 'description'],
+};
+
+export function analyzeIncomeHeader(text: string): EntityHeaderAnalysis<IncomeCSVField> {
+  return analyzeHeaderFor(text, INCOME_ALIASES);
+}
+
+export function parseIncomeCSVWithMapping(
+  text: string,
+  mapping: FieldMapping<IncomeCSVField>
+): EntityImportPreview<IncomeSource> {
+  return parseEntityCSV<IncomeCSVField, IncomeSource>(text, mapping, (cell, row) => {
+    const errors: ImportRowError[] = [];
+
+    const name = cell('name');
+    validateName(name, row, errors);
+
+    const currency = parseCurrencyCell(cell('currency'), row, errors);
+    const amountMinor = parseAmountCell(cell('amount'), currency, row, errors);
+
+    let frequency: IncomeFrequency = 'monthly';
+    const freqRaw = cell('frequency').toLowerCase();
+    if (freqRaw.length > 0) {
+      if (INCOME_FREQUENCIES.includes(freqRaw as IncomeFrequency)) {
+        frequency = freqRaw as IncomeFrequency;
+      } else {
+        errors.push({
+          row,
+          field: 'frequency',
+          message: 'Invalid frequency (weekly/monthly/yearly/one_time)',
+        });
+      }
+    }
+
+    let nextPayment: string | null = null;
+    const nextRaw = cell('next_payment');
+    if (nextRaw.length > 0) {
+      if (isValidISODate(nextRaw)) nextPayment = nextRaw;
+      else
+        errors.push({
+          row,
+          field: 'next_payment',
+          message: 'Invalid date (expected yyyy-MM-dd)',
+        });
+    }
+
+    if (errors.length > 0) return { ok: false, errors };
+    return {
+      ok: true,
+      entity: { id: importId('inc', row), name, amountMinor, currency, frequency, nextPayment },
+    };
+  });
+}
+
+// MARK: - Fixed expense (FixedExpense). Category is a NAME resolved to an id.
+
+export type FixedExpenseCSVField =
+  | 'name'
+  | 'amount'
+  | 'currency'
+  | 'category'
+  | 'frequency'
+  | 'due_date'
+  | 'autopay'
+  | 'notes';
+
+export const FIXED_EXPENSE_CSV_FIELDS: readonly FixedExpenseCSVField[] = [
+  'name',
+  'amount',
+  'currency',
+  'category',
+  'frequency',
+  'due_date',
+  'autopay',
+  'notes',
+];
+
+const FIXED_EXPENSE_ALIASES: AliasMap<FixedExpenseCSVField> = {
+  name: ['name', 'bill', 'title', 'expense'],
+  amount: ['amount', 'cost', 'price', 'monthly_cost', 'monthly_amount'],
+  currency: ['currency', 'ccy'],
+  category: ['category', 'cat'],
+  frequency: ['frequency', 'freq', 'period', 'cycle', 'billing_period'],
+  due_date: ['due_date', 'due', 'date'],
+  autopay: ['autopay', 'auto_pay', 'auto'],
+  notes: ['notes', 'note', 'memo', 'description'],
+};
+
+export function analyzeFixedExpenseHeader(
+  text: string
+): EntityHeaderAnalysis<FixedExpenseCSVField> {
+  return analyzeHeaderFor(text, FIXED_EXPENSE_ALIASES);
+}
+
+export function parseFixedExpenseCSVWithMapping(
+  text: string,
+  mapping: FieldMapping<FixedExpenseCSVField>,
+  categories: ExpenseCategory[]
+): EntityImportPreview<FixedExpense> {
+  return parseEntityCSV<FixedExpenseCSVField, FixedExpense>(text, mapping, (cell, row) => {
+    const errors: ImportRowError[] = [];
+
+    const name = cell('name');
+    validateName(name, row, errors);
+
+    const currency = parseCurrencyCell(cell('currency'), row, errors);
+    const amountMinor = parseAmountCell(cell('amount'), currency, row, errors);
+
+    const categoryId = resolveCategoryID(cell('category'), categories);
+
+    // frequency → BillingPeriod (weekly/monthly/quarterly/yearly), default monthly.
+    let billingPeriod: BillingPeriod = 'monthly';
+    const freqRaw = cell('frequency').toLowerCase();
+    if (freqRaw.length > 0) {
+      if (BILLING_PERIODS.includes(freqRaw as BillingPeriod)) {
+        billingPeriod = freqRaw as BillingPeriod;
+      } else {
+        errors.push({
+          row,
+          field: 'frequency',
+          message: 'Invalid frequency (weekly/monthly/quarterly/yearly)',
+        });
+      }
+    }
+
+    let dueDate: string | null = null;
+    const dueRaw = cell('due_date');
+    if (dueRaw.length > 0) {
+      if (isValidISODate(dueRaw)) dueDate = dueRaw;
+      else
+        errors.push({
+          row,
+          field: 'due_date',
+          message: 'Invalid date (expected yyyy-MM-dd)',
+        });
+    }
+
+    // autopay is parsed/validated (collects an error) but not stored on the web
+    // FixedExpense type (mirrors iOS validation; web model omits the field today).
+    parseBoolCell(cell('autopay'), 'autopay', row, errors);
+
+    if (errors.length > 0) return { ok: false, errors };
+    return {
+      ok: true,
+      entity: { id: importId('fix', row), name, amountMinor, currency, categoryId, billingPeriod, dueDate },
+    };
+  });
+}
+
+// MARK: - Variable expense (VariableExpense). `date` (spent_on) is REQUIRED.
+
+export type VariableExpenseCSVField =
+  | 'name'
+  | 'amount'
+  | 'currency'
+  | 'category'
+  | 'date'
+  | 'notes';
+
+export const VARIABLE_EXPENSE_CSV_FIELDS: readonly VariableExpenseCSVField[] = [
+  'name',
+  'amount',
+  'currency',
+  'category',
+  'date',
+  'notes',
+];
+
+const VARIABLE_EXPENSE_ALIASES: AliasMap<VariableExpenseCSVField> = {
+  name: ['name', 'title', 'expense', 'merchant', 'description'],
+  amount: ['amount', 'cost', 'price', 'spent'],
+  currency: ['currency', 'ccy'],
+  category: ['category', 'cat'],
+  date: ['spent_on', 'date', 'spent', 'on'],
+  notes: ['notes', 'note', 'memo'],
+};
+
+export function analyzeVariableExpenseHeader(
+  text: string
+): EntityHeaderAnalysis<VariableExpenseCSVField> {
+  return analyzeHeaderFor(text, VARIABLE_EXPENSE_ALIASES);
+}
+
+export function parseVariableExpenseCSVWithMapping(
+  text: string,
+  mapping: FieldMapping<VariableExpenseCSVField>,
+  categories: ExpenseCategory[]
+): EntityImportPreview<VariableExpense> {
+  return parseEntityCSV<VariableExpenseCSVField, VariableExpense>(text, mapping, (cell, row) => {
+    const errors: ImportRowError[] = [];
+
+    const name = cell('name');
+    validateName(name, row, errors);
+
+    const currency = parseCurrencyCell(cell('currency'), row, errors);
+    const amountMinor = parseAmountCell(cell('amount'), currency, row, errors);
+
+    const categoryId = resolveCategoryID(cell('category'), categories);
+
+    // date — REQUIRED ISO date
+    let spentOn = today();
+    const dateRaw = cell('date');
+    if (dateRaw.length === 0) {
+      errors.push({ row, field: 'date', message: 'Missing date (expected yyyy-MM-dd)' });
+    } else if (isValidISODate(dateRaw)) {
+      spentOn = dateRaw;
+    } else {
+      errors.push({ row, field: 'date', message: 'Invalid date (expected yyyy-MM-dd)' });
+    }
+
+    if (errors.length > 0) return { ok: false, errors };
+    return {
+      ok: true,
+      entity: { id: importId('var', row), name, amountMinor, currency, categoryId, spentOn },
+    };
+  });
+}
+
+// MARK: - Sample CSVs per type (for the UI's "Load sample").
+
+export const SAMPLE_INCOME_CSV = `name,amount,currency,frequency,next_payment
+Salary,3000.00,EUR,monthly,2026-07-01
+Dividend,150,USD,yearly,
+Gift,abc,EUR,one_time,`;
+
+export const SAMPLE_FIXED_EXPENSE_CSV = `name,amount,currency,category,frequency,due_date,autopay
+Rent,1200.00,EUR,Housing,monthly,2026-07-01,true
+Insurance,90,EUR,Utilities,monthly,2026-07-15,no
+Mystery,30,EUR,Nope,monthly,,`;
+
+export const SAMPLE_VARIABLE_EXPENSE_CSV = `name,amount,currency,category,spent_on
+Groceries,45.20,EUR,Groceries,2026-06-10
+Lunch,12.50,EUR,Dining,2026-06-15
+Misc,abc,EUR,Other,2026-06-16`;
