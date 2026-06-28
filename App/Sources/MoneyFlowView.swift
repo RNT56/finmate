@@ -26,26 +26,54 @@ struct MoneyFlowView: View {
     var displayCurrency: CurrencyCode = .eur
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let canvasHeight: Double = 260
     private let padding = MoneyFlowLayoutEngine.Padding(horizontal: 16, vertical: 16)
     private let nodeWidth: Double = 14
 
+    /// Pure description rows (Domain helper) — the VoiceOver tabular fallback.
+    private var flowDescriptions: [MoneyFlowAccessibility.FlowDescription] {
+        MoneyFlowAccessibility.descriptions(for: flow, currency: displayCurrency)
+    }
+
     var body: some View {
-        GeometryReader { geo in
-            let size = MoneyFlowLayoutEngine.Size(width: Double(geo.size.width), height: canvasHeight)
-            let layout = MoneyFlowLayoutEngine.layout(
-                flow: flow, size: size, padding: padding, nodeWidth: nodeWidth
-            )
-            Canvas { context, _ in
-                drawRibbons(context: context, layout: layout)
-                drawNodes(context: context, layout: layout)
-                drawLabels(context: context, layout: layout, width: Double(geo.size.width))
+        ZStack {
+            GeometryReader { geo in
+                let size = MoneyFlowLayoutEngine.Size(width: Double(geo.size.width), height: canvasHeight)
+                let layout = MoneyFlowLayoutEngine.layout(
+                    flow: flow, size: size, padding: padding, nodeWidth: nodeWidth
+                )
+                Canvas { context, _ in
+                    drawRibbons(context: context, layout: layout)
+                    drawNodes(context: context, layout: layout)
+                    drawLabels(context: context, layout: layout, width: Double(geo.size.width))
+                }
+                // Layout shifts on data change are non-essential motion (docs/06 a11y).
+                .animation(reduceMotion ? nil : .default, value: flow)
             }
+            .accessibilityHidden(true)
+
+            // VoiceOver tabular fallback: a zero-size, non-drawing overlay whose
+            // children are the per-flow rows. The container exposes the summary.
+            accessibilityTable
         }
         .frame(height: canvasHeight)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilitySummary)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(MoneyFlowAccessibility.summary(for: flow, currency: displayCurrency))
+    }
+
+    /// Non-visual per-flow rows ("Income to Savings, €2,183.52, 57 percent").
+    private var accessibilityTable: some View {
+        VStack(spacing: 0) {
+            ForEach(flowDescriptions, id: \.bucket) { row in
+                Color.clear
+                    .frame(width: 0, height: 0)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(row.label)
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: Drawing
@@ -111,25 +139,6 @@ struct MoneyFlowView: View {
         }
     }
 
-    // MARK: Accessibility
-
-    /// VoiceOver summary, e.g. "Income €3,800.00 flows to Savings €2,183.52, Fixed €1,190.00, …".
-    private var accessibilitySummary: String {
-        let income = Money(minorUnits: flow.incomeMinor, currency: displayCurrency).formatted()
-        // Largest buckets first reads most naturally.
-        let buckets: [(String, Int64)] = [
-            ("Savings", flow.savingsMinor),
-            ("Fixed", flow.fixedMinor),
-            ("Variable", flow.variableMinor),
-            ("Subscriptions", flow.subscriptionsMinor),
-        ]
-        .filter { $0.1 > 0 }
-        .sorted { $0.1 > $1.1 }
-
-        guard !buckets.isEmpty else { return "Income \(income), no outflows." }
-        let parts = buckets.map { "\($0.0) \(Money(minorUnits: $0.1, currency: displayCurrency).formatted())" }
-        return "Money flow. Income \(income) flows to " + parts.joined(separator: ", ") + "."
-    }
 }
 
 /// A wrapping legend of colored money chips shown beneath the money-flow diagram.

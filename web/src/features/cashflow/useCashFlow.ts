@@ -28,6 +28,10 @@ export interface ExpenseBreakdownRow {
 
 export interface UseCashFlow {
   loading: boolean;
+  /** Captured load error (null on the happy path); drives the inline error card. */
+  error: string | null;
+  /** Re-run the load (the error card's Retry action). */
+  reload: () => Promise<void>;
   metrics: CashFlowMetrics;
   incomes: IncomeSource[];
   fixedExpenses: FixedExpense[];
@@ -53,31 +57,46 @@ export interface UseCashFlow {
 const DISPLAY_CURRENCY: CurrencyCode = 'EUR';
 
 export function useCashFlow(
-  repository: CashFlowRepository = getRepositories().cashFlow,
+  repository: CashFlowRepository = getRepositories().cashFlow
 ): UseCashFlow {
   const [incomes, setIncomes] = useState<IncomeSource[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
-  const [variableExpenses, setVariableExpenses] = useState<VariableExpense[]>([]);
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [variableExpenses, setVariableExpenses] = useState<VariableExpense[]>(
+    []
+  );
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Subscriptions monthly roll-up comes from the shared M1 store (same sample data).
-  const { monthlyTotalMinor, loading: subsLoading } = useSubscriptions();
+  const {
+    monthlyTotalMinor,
+    loading: subsLoading,
+    error: subsError,
+  } = useSubscriptions();
   const subscriptionsMinor = monthlyTotalMinor(DISPLAY_CURRENCY);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [inc, fix, vari, cats] = await Promise.all([
-      repository.incomes(),
-      repository.fixedExpenses(),
-      repository.variableExpenses(),
-      repository.expenseCategories(),
-    ]);
-    setIncomes(inc);
-    setFixedExpenses(fix);
-    setVariableExpenses(vari);
-    setExpenseCategories(cats);
-    setLoading(false);
+    setError(null);
+    try {
+      const [inc, fix, vari, cats] = await Promise.all([
+        repository.incomes(),
+        repository.fixedExpenses(),
+        repository.variableExpenses(),
+        repository.expenseCategories(),
+      ]);
+      setIncomes(inc);
+      setFixedExpenses(fix);
+      setVariableExpenses(vari);
+      setExpenseCategories(cats);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load cash flow.');
+    } finally {
+      setLoading(false);
+    }
   }, [repository]);
 
   useEffect(() => {
@@ -89,75 +108,78 @@ export function useCashFlow(
       await repository.upsertIncome(income);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
   const removeIncome = useCallback(
     async (id: string) => {
       await repository.deleteIncome(id);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
   const addFixed = useCallback(
     async (expense: FixedExpense) => {
       await repository.upsertFixed(expense);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
   const removeFixed = useCallback(
     async (id: string) => {
       await repository.deleteFixed(id);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
   const addVariable = useCallback(
     async (expense: VariableExpense) => {
       await repository.upsertVariable(expense);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
   const removeVariable = useCallback(
     async (id: string) => {
       await repository.deleteVariable(id);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
 
   const fixedMinor = useMemo(
     () => fixedExpenses.reduce((sum, e) => sum + fixedMonthlyAmountMinor(e), 0),
-    [fixedExpenses],
+    [fixedExpenses]
   );
 
   const variableMinor = useMemo(
     () => variableExpenses.reduce((sum, e) => sum + e.amountMinor, 0),
-    [variableExpenses],
+    [variableExpenses]
   );
 
   const incomeMinor = useMemo(
     () =>
       monthlyIncomeMinor(
-        incomes.map((i) => ({ amountMinor: i.amountMinor, frequency: i.frequency })),
+        incomes.map((i) => ({
+          amountMinor: i.amountMinor,
+          frequency: i.frequency,
+        }))
       ),
-    [incomes],
+    [incomes]
   );
 
   const expenseMinor = useMemo(
     () => monthlyExpensesMinor(fixedMinor, variableMinor, subscriptionsMinor),
-    [fixedMinor, variableMinor, subscriptionsMinor],
+    [fixedMinor, variableMinor, subscriptionsMinor]
   );
 
   const metrics = useMemo(
     () => cashFlowMetrics(incomeMinor, expenseMinor),
-    [incomeMinor, expenseMinor],
+    [incomeMinor, expenseMinor]
   );
 
   const categoryName = useCallback(
     (id: string | null) => categoryNameFor(id, expenseCategories),
-    [expenseCategories],
+    [expenseCategories]
   );
 
   const breakdown = useMemo<ExpenseBreakdownRow[]>(
@@ -169,11 +191,13 @@ export function useCashFlow(
       ]
         .filter((row) => row.amountMinor > 0)
         .sort((a, b) => b.amountMinor - a.amountMinor),
-    [fixedMinor, subscriptionsMinor, variableMinor],
+    [fixedMinor, subscriptionsMinor, variableMinor]
   );
 
   return {
     loading: loading || subsLoading,
+    error: error ?? subsError,
+    reload: load,
     metrics,
     incomes,
     fixedExpenses,
@@ -195,4 +219,5 @@ export function useCashFlow(
 }
 
 /** Shared in-memory repo so all screens see the same sample data. */
-export const sharedCashFlowRepository: CashFlowRepository = new InMemoryCashFlowRepository();
+export const sharedCashFlowRepository: CashFlowRepository =
+  new InMemoryCashFlowRepository();

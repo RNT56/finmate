@@ -14,7 +14,11 @@ import {
   portfolioGainMinor,
   portfolioValueMinor,
 } from '../../core/assets';
-import { CurrencyConverter, type CurrencyCode, type ExchangeRates } from '../../core/currency';
+import {
+  CurrencyConverter,
+  type CurrencyCode,
+  type ExchangeRates,
+} from '../../core/currency';
 import { type AssetsRepository } from './repository';
 import { getRepositories } from '../../lib/repositories';
 
@@ -29,6 +33,10 @@ export const SAMPLE_ASSET_RATES: ExchangeRates = {
 
 export interface UseAssets {
   loading: boolean;
+  /** Captured load error (null on the happy path); drives the inline error card. */
+  error: string | null;
+  /** Re-run the load (the error card's Retry action). */
+  reload: () => Promise<void>;
   assets: FinancialAsset[];
   /** Portfolio total value in `displayCurrency` minor units. */
   totalValueMinor: number;
@@ -52,21 +60,33 @@ export interface UseAssets {
    */
   recordTransaction: (
     assetId: string,
-    txn: { kind: AssetTransactionKind; quantity: number; priceMinor: number; feesMinor: number },
+    txn: {
+      kind: AssetTransactionKind;
+      quantity: number;
+      priceMinor: number;
+      feesMinor: number;
+    }
   ) => Promise<void>;
 }
 
 export function useAssets(
   displayCurrency: CurrencyCode,
-  repository: AssetsRepository = getRepositories().assets,
+  repository: AssetsRepository = getRepositories().assets
 ): UseAssets {
   const [assets, setAssets] = useState<FinancialAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setAssets(await repository.all());
-    setLoading(false);
+    setError(null);
+    try {
+      setAssets(await repository.all());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load assets.');
+    } finally {
+      setLoading(false);
+    }
   }, [repository]);
 
   useEffect(() => {
@@ -78,7 +98,7 @@ export function useAssets(
       await repository.upsert(asset);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
 
   const removeAsset = useCallback(
@@ -86,13 +106,18 @@ export function useAssets(
       await repository.remove(id);
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
 
   const recordTransaction = useCallback(
     async (
       assetId: string,
-      txn: { kind: AssetTransactionKind; quantity: number; priceMinor: number; feesMinor: number },
+      txn: {
+        kind: AssetTransactionKind;
+        quantity: number;
+        priceMinor: number;
+        feesMinor: number;
+      }
     ) => {
       const current = await repository.all();
       const target = current.find((a) => a.id === assetId);
@@ -100,31 +125,37 @@ export function useAssets(
       await repository.upsert(applyTransaction(target, txn));
       await load();
     },
-    [repository, load],
+    [repository, load]
   );
 
-  const converter = useMemo(() => new CurrencyConverter(SAMPLE_ASSET_RATES), []);
+  const converter = useMemo(
+    () => new CurrencyConverter(SAMPLE_ASSET_RATES),
+    []
+  );
 
   const totalValueMinor = useMemo(
     () => portfolioValueMinor(assets, displayCurrency, converter),
-    [assets, displayCurrency, converter],
+    [assets, displayCurrency, converter]
   );
   const totalCostMinor = useMemo(
     () => portfolioCostBasisMinor(assets, displayCurrency, converter),
-    [assets, displayCurrency, converter],
+    [assets, displayCurrency, converter]
   );
   const totalGainMinor = useMemo(
     () => portfolioGainMinor(assets, displayCurrency, converter),
-    [assets, displayCurrency, converter],
+    [assets, displayCurrency, converter]
   );
-  const totalGainPct = totalCostMinor === 0 ? 0 : totalGainMinor / totalCostMinor;
+  const totalGainPct =
+    totalCostMinor === 0 ? 0 : totalGainMinor / totalCostMinor;
   const distribution = useMemo(
     () => assetDistribution(assets, displayCurrency, converter),
-    [assets, displayCurrency, converter],
+    [assets, displayCurrency, converter]
   );
 
   return {
     loading,
+    error,
+    reload: load,
     assets,
     totalValueMinor,
     totalCostMinor,

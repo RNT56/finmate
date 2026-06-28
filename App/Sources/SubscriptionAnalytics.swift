@@ -88,6 +88,8 @@ struct SubscriptionAnalyticsView: View {
             )
             .cornerRadius(4)
             .foregroundStyle(color(for: index))
+            .accessibilityLabel(slice.category)
+            .accessibilityValue("\(Money(minorUnits: slice.monthlyMinor, currency: displayCurrency).formatted()) per month, \(Int((slice.share * 100).rounded())) percent")
         }
         .chartLegend(.hidden)
         .frame(height: 220)
@@ -98,15 +100,21 @@ struct SubscriptionAnalyticsView: View {
                     .contentTransition(.numericText())
                 Text("per month").font(.caption).foregroundStyle(.secondary)
             }
+            .accessibilityHidden(true)
         }
-        .accessibilityLabel("Donut chart of monthly subscription spend by category, total \(totalMonthly.formatted())")
+        // Chart-level summary; the per-category breakdown is the legend below
+        // (each row is its own VoiceOver element — the tabular fallback).
+        .accessibilityLabel("Monthly subscription spend by category, total \(totalMonthly.formatted())")
     }
 
+    /// Visible legend that doubles as the VoiceOver tabular fallback — one element
+    /// per category, read as "Entertainment, €23.98 per month, 65 percent".
     private var legend: some View {
         VStack(spacing: 8) {
             ForEach(Array(slices.enumerated()), id: \.element.id) { index, slice in
                 HStack(spacing: 10) {
                     Circle().fill(color(for: index)).frame(width: 10, height: 10)
+                        .accessibilityHidden(true)
                     Text(slice.category).font(.subheadline)
                     Spacer()
                     Text(Money(minorUnits: slice.monthlyMinor, currency: displayCurrency).formatted())
@@ -116,8 +124,11 @@ struct SubscriptionAnalyticsView: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 40, alignment: .trailing)
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(slice.category), \(Money(minorUnits: slice.monthlyMinor, currency: displayCurrency).formatted()) per month, \(Int((slice.share * 100).rounded())) percent")
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Spending by category")
     }
 }

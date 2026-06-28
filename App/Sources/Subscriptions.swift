@@ -63,11 +63,22 @@ enum SampleData {
 @Observable
 final class SubscriptionsStore {
     private(set) var subscriptions: [Subscription] = []
+    private(set) var isLoading = false
+    private(set) var loadError: String?
     private let repository: SubscriptionRepository
 
     init(repository: SubscriptionRepository) { self.repository = repository }
 
-    func load() async { subscriptions = (try? await repository.all()) ?? [] }
+    func load() async {
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false }
+        do {
+            subscriptions = try await repository.all()
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
 
     func add(_ subscription: Subscription) async {
         try? await repository.upsert(subscription)
@@ -104,25 +115,27 @@ struct SubscriptionsListView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(store.subscriptions) { sub in
-                    NavigationLink(value: sub.id) {
-                        SubscriptionRow(subscription: sub)
+            Group {
+                if store.isLoading && store.subscriptions.isEmpty {
+                    ScrollView { SkeletonList().padding() }
+                } else if let error = store.loadError {
+                    ScrollView {
+                        ErrorStateCard(message: error) { Task { await store.load() } }
+                            .padding()
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            Task { await store.delete(id: sub.id) }
-                        } label: { Label("Delete", systemImage: "trash") }
+                } else if store.subscriptions.isEmpty {
+                    ContentUnavailableView {
+                        Label("No subscriptions yet", systemImage: "creditcard")
+                    } description: {
+                        Text("Track your recurring charges to see spending by category.")
+                    } actions: {
+                        Button { showingAdd = true } label: { Label("Add subscription", systemImage: "plus") }
+                            .buttonStyle(.borderedProminent)
                     }
-                }
-                .onMove { offsets, destination in
-                    Task { await store.move(from: offsets, to: destination) }
+                } else {
+                    subscriptionsList
                 }
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
             .navigationTitle("Subscriptions")
             .navigationDestination(for: UUID.self) { id in
                 if let sub = store.subscriptions.first(where: { $0.id == id }) {
@@ -165,6 +178,28 @@ struct SubscriptionsListView: View {
             }
             .background(FinmateGradient())
         }
+    }
+
+    private var subscriptionsList: some View {
+        List {
+            ForEach(store.subscriptions) { sub in
+                NavigationLink(value: sub.id) {
+                    SubscriptionRow(subscription: sub)
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        Task { await store.delete(id: sub.id) }
+                    } label: { Label("Delete", systemImage: "trash") }
+                }
+            }
+            .onMove { offsets, destination in
+                Task { await store.move(from: offsets, to: destination) }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 }
 

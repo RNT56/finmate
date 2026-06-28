@@ -11,10 +11,11 @@ import { useId } from 'react';
 import {
   layout,
   ribbonPath,
-  savingsMinor,
   totalExpensesMinor,
   type MoneyFlow as MoneyFlowModel,
 } from '../../core/moneyflow';
+import { describeMoneyFlow } from '../../core/chartDescription';
+import { ChartDataTable } from '../../components/ChartDataTable';
 import { formatMoney } from '../../core/money';
 import type { CurrencyCode } from '../../core/currency';
 
@@ -30,7 +31,11 @@ interface MoneyFlowProps {
   locale?: string;
 }
 
-export function MoneyFlow({ flow, currency, locale = 'de-DE' }: MoneyFlowProps) {
+export function MoneyFlow({
+  flow,
+  currency,
+  locale = 'de-DE',
+}: MoneyFlowProps) {
   const titleId = useId();
   const fmt = (minor: number) => formatMoney(minor, currency, locale);
 
@@ -44,33 +49,34 @@ export function MoneyFlow({ flow, currency, locale = 'de-DE' }: MoneyFlowProps) 
 
   const income = result.nodes.find((n) => n.id === 'income')!;
   const buckets = result.nodes.filter((n) => n.id !== 'income');
-
-  // Full spoken description of the flow (income split across each non-zero bucket).
   const pctOfIncome = (v: number) =>
     flow.incomeMinor === 0 ? 0 : Math.round((v / flow.incomeMinor) * 100);
-  const ariaLabel = [
-    `Money flow. Income ${fmt(flow.incomeMinor)} splits into`,
-    buckets
-      .map((b) => `${b.label} ${fmt(b.valueMinor)} (${pctOfIncome(b.valueMinor)}% of income)`)
-      .join(', '),
-    `Total expenses ${fmt(totalExpensesMinor(flow))}, savings ${fmt(savingsMinor(flow))}.`,
-  ].join(' ');
+
+  // Full spoken description + tabular fallback from the SHARED, unit-tested helper.
+  const { summary, rows } = describeMoneyFlow(flow, fmt);
 
   const empty = flow.incomeMinor === 0 && totalExpensesMinor(flow) === 0;
 
   return (
-    <div
-      role="img"
-      aria-labelledby={titleId}
-      style={{ width: '100%' }}
-      className="fm-mono"
-    >
-      <span id={titleId} style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
-        {empty ? 'Money flow. No income or expenses tracked yet.' : ariaLabel}
-      </span>
+    <div style={{ width: '100%' }} className="fm-mono">
+      <span
+        id={titleId}
+        className="fm-sr-only"
+        role="img"
+        aria-label={summary}
+      />
+      <ChartDataTable
+        caption="Money flow breakdown"
+        labelHeader="Flow"
+        valueHeader="Amount"
+        rows={rows}
+      />
 
       {empty ? (
-        <div className="fm-secondary" style={{ padding: '24px 0', textAlign: 'center' }}>
+        <div
+          className="fm-secondary"
+          style={{ padding: '24px 0', textAlign: 'center' }}
+        >
           No income or expenses tracked yet.
         </div>
       ) : (

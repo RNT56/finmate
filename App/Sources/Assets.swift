@@ -89,6 +89,9 @@ enum AssetsSampleData {
 @Observable
 final class AssetsStore {
     private(set) var assets: [FinancialAsset] = []
+    private(set) var isLoading = false
+    private(set) var loadError: String?
+    private(set) var hasLoaded = false
     /// Display currency switcher (EUR/USD/BTC) — reconverts totals non-mutatingly.
     var displayCurrency: CurrencyCode = .eur
 
@@ -100,7 +103,16 @@ final class AssetsStore {
         self.converter = CurrencyConverter(rates: rates)
     }
 
-    func load() async { assets = (try? await repository.all()) ?? [] }
+    func load() async {
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false; hasLoaded = true }
+        do {
+            assets = try await repository.all()
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
 
     func transactions(for assetID: UUID) async -> [AssetTransaction] {
         (try? await repository.transactions(assetID: assetID)) ?? []
@@ -201,10 +213,26 @@ struct AssetsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: FinmateTokens.spacing) {
-                currencySwitcher
-                portfolioHeader
-                if !store.distribution.isEmpty { distributionCard }
-                holdingsList
+                if store.isLoading && !store.hasLoaded {
+                    SkeletonList(count: 4)
+                } else if let error = store.loadError {
+                    ErrorStateCard(message: error) { Task { await store.load() } }
+                } else if store.assets.isEmpty {
+                    ContentUnavailableView {
+                        Label("No holdings yet", systemImage: "chart.pie")
+                    } description: {
+                        Text("Add an asset to track your portfolio value and allocation.")
+                    } actions: {
+                        Button { addingAsset = true } label: { Label("Add asset", systemImage: "plus") }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    .padding(.top, 24)
+                } else {
+                    currencySwitcher
+                    portfolioHeader
+                    if !store.distribution.isEmpty { distributionCard }
+                    holdingsList
+                }
             }
             .padding()
         }
@@ -299,6 +327,8 @@ struct AssetsView: View {
             )
             .cornerRadius(4)
             .foregroundStyle(AssetPalette.color(for: slice.type))
+            .accessibilityLabel(slice.type.displayName)
+            .accessibilityValue("\(Money(minorUnits: slice.totalMinor, currency: store.displayCurrency).formatted()), \(Int((slice.share * 100).rounded())) percent")
         }
         .chartLegend(.hidden)
         .frame(height: 220)
@@ -312,15 +342,20 @@ struct AssetsView: View {
                 Text("total").font(.caption).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 28)
+            .accessibilityHidden(true)
         }
-        .accessibilityLabel("Donut chart of portfolio allocation by asset type, total \(store.portfolioValue.formatted())")
+        // Summary; the per-type breakdown is the legend below (tabular fallback).
+        .accessibilityLabel("Portfolio allocation by asset type, total \(store.portfolioValue.formatted())")
     }
 
+    /// Visible legend that doubles as the VoiceOver tabular fallback — one element
+    /// per asset type ("Crypto, €25,000.00, 92 percent").
     private var legend: some View {
         VStack(spacing: 8) {
             ForEach(store.distribution, id: \.type) { slice in
                 HStack(spacing: 10) {
                     Circle().fill(AssetPalette.color(for: slice.type)).frame(width: 10, height: 10)
+                        .accessibilityHidden(true)
                     Text(slice.type.displayName).font(.subheadline)
                     Spacer()
                     Text(Money(minorUnits: slice.totalMinor, currency: store.displayCurrency).formatted())
@@ -330,9 +365,12 @@ struct AssetsView: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 40, alignment: .trailing)
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(slice.type.displayName), \(Money(minorUnits: slice.totalMinor, currency: store.displayCurrency).formatted()), \(Int((slice.share * 100).rounded())) percent")
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Allocation by asset type")
     }
 
     // MARK: Holdings list (glass rows with value + gain/loss)

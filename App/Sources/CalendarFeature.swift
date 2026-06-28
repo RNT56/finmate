@@ -193,6 +193,7 @@ final class CalendarStore {
 
 struct CalendarView: View {
     @State private var store = CalendarStore()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
     private let weekdaySymbols = ["S", "M", "T", "W", "T", "F", "S"]
@@ -257,7 +258,9 @@ struct CalendarView: View {
                         events: store.events(on: day),
                         isSelected: store.selectedDay.map { store.calendar.isDate($0, inSameDayAs: day) } ?? false
                     )
-                    .onTapGesture { store.selectedDay = day }
+                    .onTapGesture {
+                        withAnimation(reduceMotion ? nil : .snappy) { store.selectedDay = day }
+                    }
                 } else {
                     Color.clear.frame(height: 44)
                 }
@@ -319,9 +322,21 @@ struct CalendarView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if dayEvents.isEmpty {
                     GlassCard {
-                        Text("No events on this day.")
-                            .font(.subheadline).foregroundStyle(.secondary)
+                        VStack(spacing: 8) {
+                            Image(systemName: "calendar.badge.checkmark")
+                                .font(.title)
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                            Text("No events on this day")
+                                .font(.subheadline.weight(.medium))
+                            Text("No income, subscriptions, or bills are due.")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("No events on this day")
                 } else {
                     ForEach(dayEvents) { event in
                         GlassCard {

@@ -77,6 +77,11 @@ final class CashFlowStore {
     private(set) var income: [IncomeSource] = []
     private(set) var fixedExpenses: [FixedExpense] = []
     private(set) var variableExpenses: [VariableExpense] = []
+    private(set) var isLoading = false
+    private(set) var loadError: String?
+    /// True once an initial load has completed (lets the view tell "loading" from
+    /// "loaded but empty").
+    private(set) var hasLoaded = false
     /// The expense categories (ADR-0022) used to resolve `categoryID → name` for
     /// the breakdown rows, the expense-row secondary labels, and the form Picker.
     private(set) var expenseCategories: [Domain.Category] = []
@@ -102,10 +107,23 @@ final class CashFlowStore {
     }
 
     func load() async {
-        income = (try? await incomeRepository.all()) ?? []
-        fixedExpenses = (try? await expenseRepository.fixed()) ?? []
-        variableExpenses = (try? await expenseRepository.variable()) ?? []
-        expenseCategories = (try? await categoryRepository.categories(kind: .expense)) ?? []
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false; hasLoaded = true }
+        do {
+            income = try await incomeRepository.all()
+            fixedExpenses = try await expenseRepository.fixed()
+            variableExpenses = try await expenseRepository.variable()
+            expenseCategories = try await categoryRepository.categories(kind: .expense)
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    /// True when there is no income and no expenses of any kind after a load.
+    var isEmpty: Bool {
+        income.isEmpty && fixedExpenses.isEmpty && variableExpenses.isEmpty
+            && subscriptionsMonthlyMinor == 0
     }
 
     /// Resolve a category id to its display name, falling back to "Uncategorized"
@@ -230,13 +248,29 @@ struct CashFlowView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: FinmateTokens.spacing) {
-                    moneyFlowCard
-                    kpiGrid
-                    incomeVsExpensesCard
-                    if !store.expenseSlices.isEmpty { expenseBreakdownCard }
-                    incomeSection
-                    fixedSection
-                    variableSection
+                    if store.isLoading && !store.hasLoaded {
+                        SkeletonList(count: 4)
+                    } else if let error = store.loadError {
+                        ErrorStateCard(message: error) { Task { await store.load() } }
+                    } else if store.isEmpty {
+                        ContentUnavailableView {
+                            Label("No cash flow yet", systemImage: "chart.line.uptrend.xyaxis")
+                        } description: {
+                            Text("Add income and expenses to see your monthly money flow.")
+                        } actions: {
+                            Button { addingIncome = true } label: { Label("Add income", systemImage: "plus") }
+                                .buttonStyle(.borderedProminent)
+                        }
+                        .padding(.top, 24)
+                    } else {
+                        moneyFlowCard
+                        kpiGrid
+                        incomeVsExpensesCard
+                        if !store.expenseSlices.isEmpty { expenseBreakdownCard }
+                        incomeSection
+                        fixedSection
+                        variableSection
+                    }
                 }
                 .padding()
             }
