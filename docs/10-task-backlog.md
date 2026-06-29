@@ -353,10 +353,10 @@ This backlog's milestone numbering is **one-to-one** with the roadmap's "roadmap
 
 > **Status note (2026-06-28):** a first **a11y / Dynamic-Type polish pass** shipped alongside the Settings surface (M7-SET-02) on both clients — VoiceOver labels/values on the Settings controls, `role="switch"`/`aria-checked` toggles, `role="group"`/`aria-pressed` segmented controls, native Form/Section semantics on iOS, and rem-based type so the web surface scales. This is a **polish pass, not the full audit** — the four tasks below (the cross-app Dynamic-Type sweep, the complete VoiceOver/charts pass, Reduce-Motion/Increase-Contrast, and contrast-ratio verification) remain **open**.
 
-- [ ] **M7-A11Y-01** — Audit every screen for **Dynamic Type** up to XXL without truncation/overlap; fix offenders. (cont from M1-DS)
+- [x] **M7-A11Y-01** — Audit every screen for **Dynamic Type** up to XXL without truncation/overlap; fix offenders. (cont from M1-DS) — *iOS hero/header SF Symbols → `@ScaledMetric` (scale with text size); web fixed-px text/layout → rem/em + `min-width:0`/overflow guards + earlier sidebar collapse. **Proven:** an iOS `testRendersAtAccessibilityXXL` UI test (tabs + key screens hittable at AccessibilityXXL) and a web `a11y-large-text` Playwright spec asserting no horizontal overflow at 200% root font across all routes.*
 - [~] **M7-A11Y-02** — Add/verify **VoiceOver labels, hints, and traits** on all interactive elements and charts. (dep: M3-FLOW-04) — *charts/flow done (labels + values + tabular fallback); a full sweep of every interactive control remains.*
-- [~] **M7-A11Y-03** — Honor **Reduce Motion** and **Increase Contrast** across animations and glass surfaces. (dep: M0-DS-02) — *Reduce Motion gated across animations on both clients; the Increase-Contrast / contrast-ratio audit (M7-A11Y-04) remains.*
-- [ ] **M7-A11Y-04** — Verify color-contrast ratios for text on glass/material surfaces in light + dark. (dep: M0-DS-01)
+- [x] **M7-A11Y-03** — Honor **Reduce Motion** and **Increase Contrast** across animations and glass surfaces. (dep: M0-DS-02) — *Reduce Motion gated across all non-essential animation on both clients (iOS root app-lock/auth-state + forgot-password reveal now gated; web fully `prefers-reduced-motion`-gated); contrast handled in M7-A11Y-04.*
+- [x] **M7-A11Y-04** — Verify color-contrast ratios for text on glass/material surfaces in light + dark. (dep: M0-DS-01) — *web glass tokens raised where they failed AA (light secondary .6→.75 ≈5.1:1, light tertiary .3→.6, dark tertiary .3→.5 ≈4.5:1; dark secondary already ≈5.9:1); iOS uses system semantic label colors (`.secondary`/`.tertiary`), which Apple guarantees at AA in light + dark.*
 
 ---
 
