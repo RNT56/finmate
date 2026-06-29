@@ -119,7 +119,7 @@ function ValueCard({ content }: { content: CardContent }) {
       </div>
       <div
         className="fm-amount"
-        style={{ fontSize: 28, marginTop: 6, color: toneColor }}
+        style={{ fontSize: '1.75rem', marginTop: 6, color: toneColor }}
         aria-live="polite"
       >
         {content.value}

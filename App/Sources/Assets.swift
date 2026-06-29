@@ -463,6 +463,10 @@ struct AssetDetailView: View {
     @State private var transactions: [AssetTransaction] = []
     @State private var recordingTxn = false
 
+    /// Header glyph size + slot — scale with Dynamic Type so the icon tracks the title.
+    @ScaledMetric(relativeTo: .title2) private var headerIconSize: CGFloat = 36
+    @ScaledMetric(relativeTo: .title2) private var headerIconSlot: CGFloat = 48
+
     init(asset: FinancialAsset, store: AssetsStore) {
         self.store = store
         _asset = State(initialValue: asset)
@@ -528,9 +532,10 @@ struct AssetDetailView: View {
         GlassCard {
             HStack(spacing: 16) {
                 Image(systemName: "chart.pie.fill")
-                    .font(.system(size: 36))
+                    .font(.system(size: headerIconSize))
                     .foregroundStyle(AssetPalette.color(for: asset.type))
-                    .frame(width: 48)
+                    .frame(width: headerIconSlot)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(asset.name)
                         .font(.system(.title2, design: .rounded).weight(.bold))

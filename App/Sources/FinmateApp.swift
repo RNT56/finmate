@@ -24,6 +24,7 @@ struct FinmateApp: App {
     @AppStorage("finmate.hasOnboarded") private var hasOnboarded = false
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init() {
         let repositories = RepositoryEnvironment.resolve()
@@ -53,8 +54,8 @@ struct FinmateApp: App {
                     AppLockOverlay(controller: appLock)
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: appLock.isLocked)
-            .animation(.easeInOut(duration: 0.25), value: authStore.state)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: appLock.isLocked)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: authStore.state)
             .preferredColorScheme(preferencesStore.appearance.preferredColorScheme)
             .task {
                 await preferencesStore.load()

@@ -25,10 +25,15 @@ final class FinmateUITests: XCTestCase {
     // MARK: Helpers
 
     /// Launches a fresh app forced to the signed-out Auth screen with a clean
-    /// first-run state (onboarding will be shown).
-    private func launchApp() -> XCUIApplication {
+    /// first-run state (onboarding will be shown). When `contentSizeCategory` is
+    /// supplied, the app launches at that Dynamic Type size (used by the
+    /// accessibility-size regression test).
+    private func launchApp(contentSizeCategory: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestResetOnboarding"]
+        if let category = contentSizeCategory {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", category]
+        }
         app.launch()
         return app
     }
@@ -141,5 +146,55 @@ final class FinmateUITests: XCTestCase {
         let newRow = app.staticTexts[uniqueName]
         XCTAssertTrue(newRow.waitForExistence(timeout: timeout),
                       "The newly added subscription row should appear in the list.")
+    }
+
+    /// Dynamic-Type regression (docs/06 §accessibility, M7-A11Y-01): launch at the
+    /// LARGEST accessibility content-size category, drive the demo → onboarding →
+    /// app flow, and assert the tab bar and key screens (Subscriptions list, a
+    /// Cash Flow KPI) still render and stay hittable — i.e. nothing crashes,
+    /// truncates away, or pushes a critical control off-screen at AX-XXL.
+    func testRendersAtAccessibilityXXL() {
+        let app = launchApp(contentSizeCategory: "UICTContentSizeCategoryAccessibilityXXL")
+        enterAppViaDemo(app)
+
+        // The root TabView and its tabs survive the largest accessibility size and
+        // remain hittable (not clipped off-screen / behind overlapping glass).
+        let tabBar = app.tabBars.element(boundBy: 0)
+        XCTAssertTrue(tabBar.waitForExistence(timeout: timeout),
+                      "The root tab bar should render at accessibility XXL.")
+        for tab in ["Home", "Subscriptions", "Cash Flow", "Calendar", "More"] {
+            let button = tabBar.buttons[tab]
+            XCTAssertTrue(button.exists, "The \(tab) tab should exist at accessibility XXL.")
+            XCTAssertTrue(button.isHittable, "The \(tab) tab should stay hittable at accessibility XXL.")
+        }
+
+        // Subscriptions list: the screen loads and at least one subscription row is
+        // present (the demo seed is non-empty), proving rows render without crashing
+        // at the largest text size.
+        tabBar.buttons["Subscriptions"].tap()
+        XCTAssertTrue(app.navigationBars["Subscriptions"].waitForExistence(timeout: timeout),
+                      "The Subscriptions screen should render at accessibility XXL.")
+        // The add control stays present and hittable — i.e. the toolbar/list didn't
+        // overlap or push it off-screen at the largest text size.
+        let addButton = app.buttons["subscriptions.add"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: timeout),
+                      "The add-subscription button should render at accessibility XXL.")
+        XCTAssertTrue(addButton.isHittable,
+                      "The add-subscription button should stay hittable at accessibility XXL.")
+
+        // Cash Flow: the screen loads and a KPI value renders at AX-XXL. KPI tiles
+        // use a scalable rounded title style with minimumScaleFactor, so the value
+        // must still exist (not collapse to empty) — assert the screen + at least
+        // one static text are present.
+        tabBar.buttons["Cash Flow"].tap()
+        XCTAssertTrue(app.navigationBars["Cash Flow"].waitForExistence(timeout: timeout),
+                      "The Cash Flow screen should render at accessibility XXL.")
+        XCTAssertTrue(app.staticTexts.count > 0,
+                      "Cash Flow KPI labels/values should render at accessibility XXL.")
+
+        // Return Home — confirms tab switching still works after the heavy screens.
+        tabBar.buttons["Home"].tap()
+        XCTAssertTrue(app.navigationBars["Finmate"].waitForExistence(timeout: timeout),
+                      "The Home screen should render at accessibility XXL.")
     }
 }

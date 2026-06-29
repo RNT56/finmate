@@ -14,6 +14,10 @@ struct SubscriptionDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingDeleteConfirm = false
 
+    /// Header glyph size + slot — scale with Dynamic Type so the icon tracks the title.
+    @ScaledMetric(relativeTo: .title2) private var headerIconSize: CGFloat = 36
+    @ScaledMetric(relativeTo: .title2) private var headerIconSlot: CGFloat = 48
+
     /// Canonical annual amount in the subscription's own currency (Domain math).
     private var annualAmount: Money {
         Money(
@@ -105,9 +109,10 @@ struct SubscriptionDetailView: View {
         GlassCard {
             HStack(spacing: 16) {
                 Image(systemName: subscription.icon ?? "creditcard.fill")
-                    .font(.system(size: 36))
+                    .font(.system(size: headerIconSize))
                     .foregroundStyle(.tint)
-                    .frame(width: 48)
+                    .frame(width: headerIconSlot)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(subscription.name)
                         .font(.system(.title2, design: .rounded).weight(.bold))
