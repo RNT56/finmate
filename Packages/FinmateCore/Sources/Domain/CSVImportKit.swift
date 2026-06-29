@@ -180,6 +180,12 @@ enum CSVImportKit {
     /// Parse the whole document into records of fields. Honors quoted fields that
     /// contain commas and newlines, and `""` as a literal quote. Splits records on
     /// LF / CRLF that occur outside of quotes.
+    ///
+    /// Additive de-DE / Excel hardening (docs/13 §9): a leading UTF-8 BOM (U+FEFF) is
+    /// stripped before tokenizing, and the field delimiter is sniffed from the first
+    /// (header) line — un-quoted occurrences of `,` `;` and `\t` are counted and the
+    /// most frequent wins (tie / none → comma, preserving the legacy comma behavior).
+    /// Full UTF-16 byte-level decoding stays a file-read concern (out of scope here).
     static func parseRecords(_ text: String) -> [[String]] {
         var records: [[String]] = []
         var fields: [String] = []
@@ -189,7 +195,15 @@ enum CSVImportKit {
         // Iterate over Unicode scalars (not Characters): Swift folds "\r\n" into a
         // single grapheme cluster, which would otherwise hide the newline from the
         // switch below.
-        let scalars = Array(text.unicodeScalars)
+        var scalars = Array(text.unicodeScalars)
+
+        // (1) Strip a leading UTF-8 BOM so header aliases still match on Excel exports.
+        if scalars.first == "\u{FEFF}" { scalars.removeFirst() }
+
+        // (2) Sniff the delimiter from the header line (everything before the first
+        // un-quoted record break).
+        let delimiter = detectDelimiter(scalars)
+
         var i = 0
         let n = scalars.count
 
@@ -197,7 +211,6 @@ enum CSVImportKit {
         func endRecord() { endField(); records.append(fields); fields = [] }
 
         let quote: Unicode.Scalar = "\""
-        let comma: Unicode.Scalar = ","
         let cr: Unicode.Scalar = "\r"
         let lf: Unicode.Scalar = "\n"
 
@@ -215,7 +228,7 @@ enum CSVImportKit {
                 switch c {
                 case quote:
                     inQuotes = true; i += 1
-                case comma:
+                case delimiter:
                     endField(); i += 1
                 case cr:
                     // CRLF or lone CR → record end
@@ -233,5 +246,47 @@ enum CSVImportKit {
             endRecord()
         }
         return records
+    }
+
+    /// Sniff the field delimiter from the header line: count un-quoted `,` `;` `\t`
+    /// occurrences in the scalars before the first un-quoted record break, and pick the
+    /// most frequent. Comma wins on a tie or when none appear (legacy default).
+    private static func detectDelimiter(_ scalars: [Unicode.Scalar]) -> Unicode.Scalar {
+        let comma: Unicode.Scalar = ","
+        let semicolon: Unicode.Scalar = ";"
+        let tab: Unicode.Scalar = "\t"
+        let quote: Unicode.Scalar = "\""
+        let cr: Unicode.Scalar = "\r"
+        let lf: Unicode.Scalar = "\n"
+
+        var commas = 0, semis = 0, tabs = 0
+        var inQuotes = false
+        var i = 0
+        let n = scalars.count
+        while i < n {
+            let c = scalars[i]
+            if inQuotes {
+                if c == quote {
+                    if i + 1 < n && scalars[i + 1] == quote { i += 2; continue } // escaped quote
+                    inQuotes = false; i += 1; continue
+                }
+                i += 1
+            } else {
+                switch c {
+                case quote: inQuotes = true
+                case comma: commas += 1
+                case semicolon: semis += 1
+                case tab: tabs += 1
+                case cr, lf: i = n; continue   // end of header line
+                default: break
+                }
+                i += 1
+            }
+        }
+
+        // Most frequent wins; comma is preferred on a tie / when none are present.
+        if semis > commas && semis >= tabs { return semicolon }
+        if tabs > commas && tabs > semis { return tab }
+        return comma
     }
 }

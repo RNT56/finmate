@@ -38,6 +38,75 @@ describe('tokenizeCSV (RFC-4180-lite)', () => {
   });
 });
 
+// Delimiter auto-detection + BOM strip (de-DE / Excel hardening, docs/13 §9).
+// SAME vectors as the Swift suite (SubscriptionCSVImporterTests).
+describe('tokenizeCSV — delimiter auto-detection + BOM strip', () => {
+  it('parses a semicolon-delimited CSV into the right columns', () => {
+    const csv =
+      'name;amount;currency;billing_period;payment_method\n' +
+      'Netflix;12.99;EUR;monthly;credit_card\n' +
+      'Spotify;7.99;USD;monthly;paypal';
+    const preview = parseSubscriptionsCSV(csv);
+    expect(preview.totalRows).toBe(2);
+    expect(preview.valid).toHaveLength(2);
+    expect(preview.valid[0].name).toBe('Netflix');
+    expect(preview.valid[0].amountMinor).toBe(1299);
+    expect(preview.valid[0].currency).toBe('EUR');
+    expect(preview.valid[0].paymentMethod).toBe('credit_card');
+    expect(preview.valid[1].name).toBe('Spotify');
+    expect(preview.valid[1].amountMinor).toBe(799);
+    expect(preview.valid[1].currency).toBe('USD');
+  });
+
+  it('parses a tab-delimited CSV into the right columns', () => {
+    const csv = 'name\tamount\tcurrency\nNetflix\t12.99\tEUR\nGitHub\t5.00\tUSD\n';
+    const preview = parseSubscriptionsCSV(csv);
+    expect(preview.totalRows).toBe(2);
+    expect(preview.valid).toHaveLength(2);
+    expect(preview.valid[0].name).toBe('Netflix');
+    expect(preview.valid[0].amountMinor).toBe(1299);
+    expect(preview.valid[0].currency).toBe('EUR');
+    expect(preview.valid[1].amountMinor).toBe(500);
+    expect(preview.valid[1].currency).toBe('USD');
+  });
+
+  it('strips a leading UTF-8 BOM so the first header alias still matches', () => {
+    const csv = '\uFEFFname,amount,currency\nNetflix,12.99,EUR\n';
+    const analysis = analyzeHeader(csv);
+    // Without the strip the first token would be the BOM + name and miss the alias.
+    expect(analysis.headers[0]).toBe('name');
+    expect(analysis.autoMapping.name).toBe(0);
+
+    const preview = parseSubscriptionsCSV(csv);
+    expect(preview.valid).toHaveLength(1);
+    expect(preview.valid[0].name).toBe('Netflix');
+    expect(preview.valid[0].amountMinor).toBe(1299);
+  });
+
+  it('parses a BOM + semicolon CSV (the common de-DE Excel shape)', () => {
+    const csv = '\uFEFFname;amount;currency\nNetflix;12.99;EUR\n';
+    const preview = parseSubscriptionsCSV(csv);
+    expect(preview.valid).toHaveLength(1);
+    expect(preview.valid[0].name).toBe('Netflix');
+    expect(preview.valid[0].amountMinor).toBe(1299);
+    expect(preview.valid[0].currency).toBe('EUR');
+  });
+
+  it('keeps comma the delimiter despite a semicolon inside a data field', () => {
+    const csv = 'name,amount,currency\n"Acme; Inc",10.00,USD';
+    const preview = parseSubscriptionsCSV(csv);
+    expect(preview.valid).toHaveLength(1);
+    expect(preview.valid[0].name).toBe('Acme; Inc');
+    expect(preview.valid[0].amountMinor).toBe(1000);
+    expect(preview.valid[0].currency).toBe('USD');
+  });
+
+  it('keeps existing comma behavior unchanged (no BOM, comma header)', () => {
+    expect(tokenizeCSV('a,b,c')).toEqual([['a', 'b', 'c']]);
+    expect(tokenizeCSV('name,amount\n"Acme, Inc",10.00')[1]).toEqual(['Acme, Inc', '10.00']);
+  });
+});
+
 describe('parseSubscriptionsCSV — 3-row vector (valid / bad amount / bad currency)', () => {
   const csv = [
     'name,amount,currency,billing_period,payment_method',

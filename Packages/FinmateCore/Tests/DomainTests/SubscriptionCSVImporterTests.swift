@@ -228,4 +228,77 @@ import Foundation
         #expect(preview.valid.first?.amountMinor == 850)
         #expect(preview.valid.first?.currency == .eur)        // unmapped → default
     }
+
+    // MARK: - Delimiter auto-detection + BOM strip (de-DE / Excel hardening, docs/13 §9)
+
+    // A semicolon-delimited CSV (typical de-DE Excel export) parses into the right
+    // columns. The European amount "12,99" is quoted so its comma is not a delimiter.
+    @Test func semicolonDelimiterParses() {
+        let csv = """
+        name;amount;currency;billing_period;payment_method
+        Netflix;12.99;EUR;monthly;credit_card
+        Spotify;7.99;USD;monthly;paypal
+        """
+        let preview = SubscriptionCSVImporter.parseSubscriptionsCSV(csv)
+        #expect(preview.totalRows == 2)
+        #expect(preview.valid.count == 2)
+        #expect(preview.valid.first?.name == "Netflix")
+        #expect(preview.valid.first?.amountMinor == 1299)
+        #expect(preview.valid.first?.currency == .eur)
+        #expect(preview.valid.first?.paymentMethod == .creditCard)
+        #expect(preview.valid.last?.name == "Spotify")
+        #expect(preview.valid.last?.amountMinor == 799)
+        #expect(preview.valid.last?.currency == .usd)
+    }
+
+    // A tab-delimited CSV parses into the right columns.
+    @Test func tabDelimiterParses() {
+        let csv = "name\tamount\tcurrency\nNetflix\t12.99\tEUR\nGitHub\t5.00\tUSD\n"
+        let preview = SubscriptionCSVImporter.parseSubscriptionsCSV(csv)
+        #expect(preview.totalRows == 2)
+        #expect(preview.valid.count == 2)
+        #expect(preview.valid.first?.name == "Netflix")
+        #expect(preview.valid.first?.amountMinor == 1299)
+        #expect(preview.valid.first?.currency == .eur)
+        #expect(preview.valid.last?.amountMinor == 500)
+        #expect(preview.valid.last?.currency == .usd)
+    }
+
+    // A leading UTF-8 BOM is stripped so the first header alias still matches.
+    @Test func leadingBOMStripped() {
+        let csv = "\u{FEFF}name,amount,currency\nNetflix,12.99,EUR\n"
+        let analysis = SubscriptionCSVImporter.analyzeHeader(csv)
+        // Without the strip the first token would be "\u{FEFF}name" and miss the alias.
+        #expect(analysis.headers.first == "name")
+        #expect(analysis.autoMapping[.name] == 0)
+
+        let preview = SubscriptionCSVImporter.parseSubscriptionsCSV(csv)
+        #expect(preview.valid.count == 1)
+        #expect(preview.valid.first?.name == "Netflix")
+        #expect(preview.valid.first?.amountMinor == 1299)
+    }
+
+    // A BOM + semicolon delimiter together (the most common de-DE Excel shape) parse.
+    @Test func bomPlusSemicolonParses() {
+        let csv = "\u{FEFF}name;amount;currency\nNetflix;12.99;EUR\n"
+        let preview = SubscriptionCSVImporter.parseSubscriptionsCSV(csv)
+        #expect(preview.valid.count == 1)
+        #expect(preview.valid.first?.name == "Netflix")
+        #expect(preview.valid.first?.amountMinor == 1299)
+        #expect(preview.valid.first?.currency == .eur)
+    }
+
+    // Plain comma CSV is unchanged: a header value containing a semicolon does NOT flip
+    // the detected delimiter away from comma.
+    @Test func plainCommaUnchangedDespiteSemicolonInField() {
+        let csv = """
+        name,amount,currency
+        "Acme; Inc",10.00,USD
+        """
+        let preview = SubscriptionCSVImporter.parseSubscriptionsCSV(csv)
+        #expect(preview.valid.count == 1)
+        #expect(preview.valid.first?.name == "Acme; Inc")
+        #expect(preview.valid.first?.amountMinor == 1000)
+        #expect(preview.valid.first?.currency == .usd)
+    }
 }

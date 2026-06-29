@@ -92,11 +92,67 @@ const HEADER_ALIASES: Record<string, string> = {
 };
 
 /**
+ * Sniff the field delimiter from the header line: count un-quoted `,` `;` `\t`
+ * occurrences in the text before the first un-quoted record break, and pick the
+ * most frequent. Comma wins on a tie or when none appear (legacy default).
+ * Mirrors the Swift `CSVImportKit.detectDelimiter`.
+ */
+function detectDelimiter(text: string): string {
+  let commas = 0;
+  let semis = 0;
+  let tabs = 0;
+  let inQuotes = false;
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i += 1;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+    if (c === '"') {
+      inQuotes = true;
+      i += 1;
+      continue;
+    }
+    if (c === ',') commas += 1;
+    else if (c === ';') semis += 1;
+    else if (c === '\t') tabs += 1;
+    else if (c === '\r' || c === '\n') break; // end of header line
+    i += 1;
+  }
+  // Most frequent wins; comma is preferred on a tie / when none are present.
+  if (semis > commas && semis >= tabs) return ';';
+  if (tabs > commas && tabs > semis) return '\t';
+  return ',';
+}
+
+/**
  * RFC-4180-lite tokenizer (docs/13 §9.4). Splits the full CSV text into rows of
  * fields. Handles quoted fields containing commas and CRLF/LF, escaped `""`
  * quotes, and embedded newlines inside quotes. O(len).
+ *
+ * Additive de-DE / Excel hardening (docs/13 §9): a leading UTF-8 BOM (U+FEFF) is
+ * stripped before tokenizing, and the field delimiter is sniffed from the first
+ * (header) line — un-quoted occurrences of `,` `;` and `\t` are counted and the
+ * most frequent wins (tie / none → comma, preserving the legacy comma behavior).
+ * Full UTF-16 byte-level decoding stays a file-read concern (out of scope here).
  */
-export function tokenizeCSV(text: string): string[][] {
+export function tokenizeCSV(input: string): string[][] {
+  // (1) Strip a leading UTF-8 BOM so header aliases still match on Excel exports.
+  const text = input.charCodeAt(0) === 0xfeff ? input.slice(1) : input;
+  // (2) Sniff the delimiter from the header line.
+  const delimiter = detectDelimiter(text);
+
   const rows: string[][] = [];
   let field = '';
   let row: string[] = [];
@@ -136,7 +192,7 @@ export function tokenizeCSV(text: string): string[][] {
       i += 1;
       continue;
     }
-    if (c === ',') {
+    if (c === delimiter) {
       endField();
       i += 1;
       continue;
