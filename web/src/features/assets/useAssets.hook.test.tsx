@@ -84,7 +84,10 @@ describe('useAssets (hook)', () => {
   });
 
   it('loads empty (no NaN, gain pct 0)', async () => {
-    const { result } = renderHook(() => useAssets('EUR', new MockAssetsRepository([])));
+    // Hoist the repo to a stable reference — constructing it inside the render
+    // callback would change useAssets' `repository` dep every render → effect loop.
+    const emptyRepo = new MockAssetsRepository([]);
+    const { result } = renderHook(() => useAssets('EUR', emptyRepo));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.assets).toHaveLength(0);
     expect(result.current.totalValueMinor).toBe(0);
@@ -162,7 +165,8 @@ describe('useAssets (hook)', () => {
   });
 
   it('captures a load error into error state', async () => {
-    const { result } = renderHook(() => useAssets('EUR', new ThrowingAssetsRepository()));
+    const throwingRepo = new ThrowingAssetsRepository(); // stable ref (see note above)
+    const { result } = renderHook(() => useAssets('EUR', throwingRepo));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe('assets boom');
     expect(result.current.assets).toHaveLength(0);
