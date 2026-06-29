@@ -105,7 +105,7 @@ struct AppLockOverlay: View {
 
     var body: some View {
         ZStack {
-            FinmateGradient().ignoresSafeArea()
+            FinmateBackground().ignoresSafeArea()
             GlassCard {
                 VStack(spacing: FinmateTokens.spacing) {
                     Image(systemName: "lock.fill")
@@ -124,7 +124,7 @@ struct AppLockOverlay: View {
                         Label("Unlock with Face ID", systemImage: "faceid")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .finmateProminent()
                     .controlSize(.large)
                     .disabled(controller.isAuthenticating)
                     .accessibilityLabel("Unlock Finmate with Face ID or Touch ID")

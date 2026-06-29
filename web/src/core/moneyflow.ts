@@ -79,16 +79,17 @@ export const BUCKET_LABELS: Record<BucketKind, string> = {
 };
 
 /**
- * Palette CSS variables per node (docs/06): Fixed≈red, Variable≈orange,
- * Subscriptions≈violet, Savings≈emerald/green, Income≈accent. var() with a literal
- * fallback so the renderer is correct even without the stylesheet (and in jsdom).
+ * Palette CSS variables per node — OBSIDIAN money-flow ramp (mono + bronze,
+ * docs/06): Income≈mono ink, Fixed/Variable/Subscriptions≈bronze tones,
+ * Savings≈up-green. var() with a literal fallback so the renderer is correct
+ * even without the stylesheet (and in jsdom).
  */
 export const FLOW_COLORS: Record<BucketKind | 'income', string> = {
-  income: 'var(--fm-accent, #0a84ff)',
-  fixed: 'var(--fm-down, #d7263d)',
-  variable: 'var(--fm-warning, #e8830c)',
-  subscriptions: 'var(--fm-flow-violet, #8e5cff)',
-  savings: 'var(--fm-up, #1f9d55)',
+  income: 'var(--fm-flow-income, #1a1c20)',
+  fixed: 'var(--fm-flow-fixed, #b08a5a)',
+  variable: 'var(--fm-flow-variable, #cdb089)',
+  subscriptions: 'var(--fm-flow-subscriptions, #8a6a42)',
+  savings: 'var(--fm-flow-savings, #248a3d)',
 };
 
 export interface FlowNode {

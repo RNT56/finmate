@@ -10,12 +10,13 @@ import Domain
 // MARK: Event-kind presentation (one design language; dots only — docs/06)
 
 extension CalendarEventKind {
-    /// income = green, subscription = accent/violet, fixedExpense = orange (docs/06).
+    /// Obsidian dots: income = up-green, subscription = bronze accent,
+    /// fixedExpense = bronze-deep (docs/06).
     var dotColor: Color {
         switch self {
-        case .income:       return .green
-        case .subscription: return .accentColor
-        case .fixedExpense: return .orange
+        case .income:       return FinmateColor.up
+        case .subscription: return FinmateColor.bronze
+        case .fixedExpense: return FinmateColor.bronzeDeep
         }
     }
 
@@ -212,7 +213,7 @@ struct CalendarView: View {
                 .padding()
             }
             .navigationTitle("Calendar")
-            .background(FinmateGradient())
+            .background(FinmateBackground())
         }
     }
 
@@ -357,7 +358,7 @@ struct CalendarView: View {
                                 Spacer()
                                 Text(event.money.formatted())
                                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                                    .foregroundStyle(event.kind == .income ? .green : .primary)
+                                    .foregroundStyle(event.kind == .income ? FinmateColor.up : .primary)
                             }
                         }
                         .accessibilityElement(children: .combine)
@@ -396,7 +397,7 @@ private struct DayCell: View {
         VStack(spacing: 4) {
             Text(dayNumber)
                 .font(.callout.weight(isSelected ? .bold : .regular))
-                .foregroundStyle(isSelected ? Color.accentColor : .primary)
+                .foregroundStyle(isSelected ? FinmateColor.bronze : .primary)
             HStack(spacing: 3) {
                 ForEach(dotKinds, id: \.self) { kind in
                     Circle().fill(kind.dotColor).frame(width: 5, height: 5)
@@ -409,7 +410,7 @@ private struct DayCell: View {
         .modifier(GlassBackground(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.accentColor, lineWidth: isSelected ? 2 : 0)
+                .stroke(FinmateColor.bronze, lineWidth: isSelected ? 2 : 0)
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)

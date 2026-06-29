@@ -46,7 +46,7 @@ struct CalculatorView: View {
         }
         .navigationTitle("BTC Calculator")
         .navigationBarTitleDisplayMode(.inline)
-        .background(FinmateGradient())
+        .background(FinmateBackground())
     }
 
     private var inputCard: some View {
@@ -157,7 +157,7 @@ struct MoreView: View {
                 case .settings:   SettingsView()
                 }
             }
-            .background(FinmateGradient())
+            .background(FinmateBackground())
         }
     }
 }

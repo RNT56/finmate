@@ -12,11 +12,11 @@ import Domain
 extension FlowColorToken {
     var color: Color {
         switch self {
-        case .income:        return .accentColor
-        case .fixed:         return .red
-        case .variable:      return .orange
-        case .subscriptions: return .purple
-        case .savings:       return .green
+        case .income:        return FinmateColor.Flow.income
+        case .fixed:         return FinmateColor.Flow.fixed
+        case .variable:      return FinmateColor.Flow.variable
+        case .subscriptions: return FinmateColor.Flow.subscriptions
+        case .savings:       return FinmateColor.Flow.savings
         }
     }
 }

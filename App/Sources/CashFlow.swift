@@ -255,8 +255,7 @@ struct CashFlowView: View {
     @State private var editingVariable: VariableExpense?
     @State private var addingVariable = false
 
-    private let palette: [Color] = [.blue, .purple, .pink, .orange, .teal, .green, .indigo, .mint]
-    private func color(for index: Int) -> Color { palette[index % palette.count] }
+    private func color(for index: Int) -> Color { FinmateColor.ramp(index) }
 
     var body: some View {
         NavigationStack {
@@ -272,8 +271,7 @@ struct CashFlowView: View {
                         } description: {
                             Text("Add income and expenses to see your monthly money flow.")
                         } actions: {
-                            Button { addingIncome = true } label: { Label("Add income", systemImage: "plus") }
-                                .buttonStyle(.borderedProminent)
+                            GlassButton("Add income", systemImage: "plus") { addingIncome = true }
                         }
                         .padding(.top, 24)
                     } else {
@@ -289,7 +287,7 @@ struct CashFlowView: View {
                 .padding()
             }
             .navigationTitle("Cash Flow")
-            .background(FinmateGradient())
+            .background(FinmateBackground())
             .sheet(isPresented: $addingIncome) {
                 IncomeFormView(income: nil) { saved in Task { await store.addIncome(saved) } }
             }
@@ -352,10 +350,10 @@ struct CashFlowView: View {
 
     private var flowLegend: some View {
         let items: [(String, Int64, Color)] = [
-            ("Fixed", store.moneyFlow.fixedMinor, .red),
-            ("Variable", store.moneyFlow.variableMinor, .orange),
-            ("Subscriptions", store.moneyFlow.subscriptionsMinor, .purple),
-            ("Savings", store.moneyFlow.savingsMinor, .green),
+            ("Fixed", store.moneyFlow.fixedMinor, FinmateColor.Flow.fixed),
+            ("Variable", store.moneyFlow.variableMinor, FinmateColor.Flow.variable),
+            ("Subscriptions", store.moneyFlow.subscriptionsMinor, FinmateColor.Flow.subscriptions),
+            ("Savings", store.moneyFlow.savingsMinor, FinmateColor.Flow.savings),
         ].filter { $0.1 > 0 }
         return FlowWrap(items: items)
     }
@@ -365,13 +363,13 @@ struct CashFlowView: View {
     private var kpiGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: FinmateTokens.spacing) {
             KPICard(title: "Monthly Income", value: store.monthlyIncome.formatted(),
-                    symbol: "arrow.down.circle.fill", tint: .green)
+                    symbol: "arrow.down.circle.fill", tint: FinmateColor.up)
             KPICard(title: "Monthly Expenses", value: store.monthlyExpenses.formatted(),
-                    symbol: "arrow.up.circle.fill", tint: .orange)
+                    symbol: "arrow.up.circle.fill", tint: FinmateColor.bronze)
             KPICard(title: "Net", value: store.net.formatted(),
-                    symbol: "equal.circle.fill", tint: store.metrics.netMinor >= 0 ? .blue : .red)
+                    symbol: "equal.circle.fill", tint: store.metrics.netMinor >= 0 ? FinmateColor.bronze : FinmateColor.down)
             KPICard(title: "Savings rate", value: savingsRateText,
-                    symbol: "percent", tint: store.metrics.savingsRate >= 0 ? .teal : .red)
+                    symbol: "percent", tint: store.metrics.savingsRate >= 0 ? FinmateColor.up : FinmateColor.down)
         }
     }
 
@@ -389,13 +387,13 @@ struct CashFlowView: View {
                 Chart {
                     BarMark(x: .value("Kind", "Income"),
                             y: .value("Amount", (store.monthlyIncome.decimalValue as NSDecimalNumber).doubleValue))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(FinmateColor.up)
                         .annotation(position: .top) {
                             Text(store.monthlyIncome.formatted()).font(.caption2).foregroundStyle(.secondary)
                         }
                     BarMark(x: .value("Kind", "Expenses"),
                             y: .value("Amount", (store.monthlyExpenses.decimalValue as NSDecimalNumber).doubleValue))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(FinmateColor.bronze)
                         .annotation(position: .top) {
                             Text(store.monthlyExpenses.formatted()).font(.caption2).foregroundStyle(.secondary)
                         }
@@ -438,7 +436,7 @@ struct CashFlowView: View {
         editableSection(
             title: "Income",
             symbol: "arrow.down.circle.fill",
-            tint: .green,
+            tint: FinmateColor.up,
             add: { addingIncome = true },
             addLabel: "Add income"
         ) {
@@ -464,7 +462,7 @@ struct CashFlowView: View {
         editableSection(
             title: "Fixed expenses",
             symbol: "calendar.badge.clock",
-            tint: .red,
+            tint: FinmateColor.Flow.fixed,
             add: { addingFixed = true },
             addLabel: "Add fixed expense"
         ) {
@@ -490,7 +488,7 @@ struct CashFlowView: View {
         editableSection(
             title: "Variable expenses",
             symbol: "cart.fill",
-            tint: .orange,
+            tint: FinmateColor.Flow.variable,
             add: { addingVariable = true },
             addLabel: "Add variable expense"
         ) {
@@ -548,7 +546,7 @@ struct CashFlowView: View {
             Spacer()
             Text(amount).font(.subheadline.monospacedDigit())
             Button(action: delete) {
-                Image(systemName: "trash").foregroundStyle(.red)
+                Image(systemName: "trash").foregroundStyle(FinmateColor.down)
             }
             .buttonStyle(.borderless)
             .accessibilityLabel("Delete \(name)")
@@ -563,34 +561,6 @@ struct CashFlowView: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: "Edit", edit)
         .accessibilityAction(named: "Delete", delete)
-    }
-}
-
-/// A Liquid Glass KPI tile.
-struct KPICard: View {
-    let title: String
-    let value: String
-    let symbol: String
-    let tint: Color
-
-    var body: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Image(systemName: symbol).foregroundStyle(tint)
-                        .accessibilityHidden(true)
-                    Text(title).font(.caption).foregroundStyle(.secondary)
-                }
-                Text(value)
-                    .font(.system(.title2, design: .rounded).weight(.bold))
-                    .contentTransition(.numericText())
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title), \(value)")
     }
 }
 

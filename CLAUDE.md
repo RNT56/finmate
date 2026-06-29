@@ -40,7 +40,7 @@ These come from the product owner and are dated **2026-06-27**. Do not contradic
 | 1 | **Platform** | iOS-first, **native Swift / SwiftUI** as the **lead client**. iPhone, mobile-only for the iOS v1. No React Native, no Flutter, no cross-platform UI (iOS UI stays native). iPad / Mac Catalyst are post-v1. **A web client is now in scope** as a *separate* second client after the iOS foundation — Vite + React 19 + TypeScript over the **same Supabase backend contract**, **not** a shared UI codebase ([ADR-0021](./docs/12-decisions-adr.md), amending ADR-0002; see [docs/16-web-client.md](./docs/16-web-client.md)). |
 | 2 | **Backend** | **Supabase** — managed PostgreSQL + Auth + RLS + Edge Functions + Realtime + Storage, accessed via the official `supabase-swift` SDK. Security centered on RLS deriving ownership from `auth.uid()`. |
 | 3 | **v1 scope** | **All feature pillars** ship in v1: subscriptions + analytics, income & expenses, cost-tracker money-flow, payday calendar, CSV import, assets/investments, crypto/BTC calculator, multi-currency, settings/theming. An internal build order (milestones **M0..Mn**) still applies — see [docs/08-roadmap-and-milestones.md](./docs/08-roadmap-and-milestones.md). |
-| 4 | **Design** | One cohesive **Liquid Glass** language. iOS 26+ Liquid Glass APIs (`glassEffect`, `GlassEffectContainer`, `glassEffectID`, `.glass`/`.glassProminent` button styles, scroll-edge effects) with **graceful fallback** to system Materials (`.ultraThinMaterial`, `.regularMaterial`, …) on iOS 18–25. Light + dark + system. Explicitly **not** Substimate's 9 styles. |
+| 4 | **Design** | One cohesive **Liquid Glass** language — the **Obsidian** identity: near-monochrome **ink/graphite** + a single warm **bronze** signature accent (mono **ink** primary-action fill; green=gain / red=loss / BTC-orange kept as *semantics*, not brand) over a **near-flat** neutral background. iOS 26+ Liquid Glass APIs (`glassEffect`, `.glass`/`.glassProminent` button styles, scroll-edge effects; `GlassEffectContainer`/`glassEffectID` grouping/morph still to come) with **graceful fallback** to system Materials (`.ultraThinMaterial`, `.regularMaterial`, …) on iOS 18–25. Light + dark + system. Explicitly **not** Substimate's 9 styles, and **not** the earlier system-blue + blue/orange/violet identity. |
 | 5 | **Deployment target** | **Minimum iOS 18.0.** Design-complete Liquid Glass on iOS 26+, automatic Materials fallback on 18–25. Built with **Xcode 26+ / Swift 6** (strict concurrency). |
 | 6 | **Execution underway** | The initial docs-only pass is complete; implementation has begun. **M0 foundation + M1 Subscriptions + M2 Income & Expenses** are built, compiled, and tested on **both** clients (iOS + web). See [§2](#2-current-status) for the live status. |
 
@@ -53,7 +53,7 @@ Full rationale and version pins in [docs/04-tech-stack.md](./docs/04-tech-stack.
 | Layer | Choice | Notes |
 |-------|--------|-------|
 | Language | Swift 6 (strict concurrency) | `SWIFT_STRICT_CONCURRENCY=complete` |
-| UI | SwiftUI | iOS 26 Liquid Glass APIs + Materials fallback |
+| UI | SwiftUI | Obsidian Liquid Glass (iOS 26 APIs + Materials fallback); monochrome ink + bronze, near-flat |
 | State | Observation framework | `@Observable`, `@Bindable`, `@Environment` — not `ObservableObject` |
 | Concurrency | Swift Concurrency | `async`/`await`, actors, `@MainActor` |
 | Min OS / Tooling | iOS 18.0 / Xcode 26+ | |
@@ -236,7 +236,8 @@ When you act on this repository:
 
 | Term | Meaning |
 |------|---------|
-| **Liquid Glass** | iOS 26 glass material system (`glassEffect`, `GlassEffectContainer`, `glassEffectID`, `.glass`/`.glassProminent`). Finmate's single design language, with Materials fallback on iOS 18–25. |
+| **Liquid Glass** | iOS 26 glass material system (`glassEffect`, `.glass`/`.glassProminent` button styles, scroll-edge effects; `GlassEffectContainer`/`glassEffectID` grouping/morph not yet adopted). Finmate's single design language, with Materials fallback on iOS 18–25. |
+| **Obsidian** | Finmate's design identity: a near-monochrome **ink/graphite** palette with one warm **bronze** signature accent and a high-contrast **ink** primary-action fill, laid over a **near-flat** neutral background (depth comes from glass + content, not a colorful canvas), expressed through Liquid Glass. Green=gain / red=loss / Bitcoin-orange are kept as semantics, not brand. Replaces the earlier system-blue + blue/orange/violet identity. See [docs/06](./docs/06-design-system.md). |
 | **Minor units** | Smallest indivisible unit of a currency: cents for EUR/USD, satoshis for BTC. Stored as `Int64` `amount_minor`. |
 | **`Money`** | Domain value type pairing `amount_minor: Int64` with an ISO `currency` code; uses `Decimal` for computation and formatting. |
 | **satsPerBTC** | `100_000_000` — satoshis in one bitcoin. |

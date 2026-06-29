@@ -47,10 +47,8 @@ struct SubscriptionAnalyticsView: View {
         Money(minorUnits: slices.reduce(Int64(0)) { $0 + $1.monthlyMinor }, currency: displayCurrency)
     }
 
-    // docs/14 chart palette — kept inline here; in production this lives in DesignSystem.
-    private let palette: [Color] = [.blue, .purple, .pink, .orange, .teal, .green, .indigo, .mint]
-
-    private func color(for index: Int) -> Color { palette[index % palette.count] }
+    // docs/14 chart palette — the Obsidian bronze→tan monochrome ramp (DesignSystem).
+    private func color(for index: Int) -> Color { FinmateColor.ramp(index) }
 
     var body: some View {
         ScrollView {
@@ -77,7 +75,7 @@ struct SubscriptionAnalyticsView: View {
         }
         .navigationTitle("Analytics")
         .navigationBarTitleDisplayMode(.inline)
-        .background(FinmateGradient())
+        .background(FinmateBackground())
     }
 
     private var donut: some View {

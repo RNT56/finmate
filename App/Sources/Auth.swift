@@ -118,7 +118,7 @@ struct AuthView: View {
             }
             .padding()
         }
-        .background(FinmateGradient())
+        .background(FinmateBackground())
         .disabled(store.isBusy)
         .overlay {
             if store.isBusy { ProgressView().controlSize(.large) }
@@ -175,7 +175,7 @@ struct AuthView: View {
             Text(mode.rawValue)
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
+        .finmateProminent()
         .controlSize(.large)
         .disabled(!formIsValid)
     }
@@ -198,7 +198,7 @@ struct AuthView: View {
                 } label: {
                     Text("Send reset link").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .finmateGlassButton()
                 .controlSize(.large)
                 .disabled(!resetEmailIsValid)
                 .accessibilityIdentifier("auth.sendReset")
@@ -245,7 +245,7 @@ struct AuthView: View {
             Label("Try the demo", systemImage: "play.circle.fill")
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
+        .finmateGlassButton()
         .controlSize(.large)
         .accessibilityIdentifier("auth.tryDemo")
         .accessibilityHint("Explore the app offline with sample data, no account needed")
@@ -358,13 +358,13 @@ struct OnboardingView: View {
                 } label: {
                     Text("Get started").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .finmateProminent()
                 .controlSize(.large)
                 .accessibilityIdentifier("onboarding.continue")
             }
             .padding()
         }
-        .background(FinmateGradient())
+        .background(FinmateBackground())
         .onAppear {
             currency = preferences.preferences.defaultCurrency
             appearance = preferences.appearance
