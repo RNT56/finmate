@@ -64,6 +64,11 @@ public protocol AuthRepository: Sendable {
 
     /// Sign out, clearing the persisted session.
     func signOut() async throws
+
+    /// Send a password-reset email. Implementations should not reveal whether an
+    /// account exists for the address (the UI shows a neutral confirmation). The
+    /// demo / no-config path acknowledges without any network call.
+    func sendPasswordReset(email: String) async throws
 }
 
 // MARK: - AuthStore (@MainActor @Observable) — unidirectional MVVM (docs/03)
@@ -82,6 +87,9 @@ public final class AuthStore {
     public private(set) var isBusy: Bool = false
     /// Last action error, surfaced to the UI; cleared on the next attempt.
     public private(set) var errorMessage: String?
+    /// Last non-error confirmation surfaced to the UI (e.g. password-reset sent);
+    /// cleared on the next attempt.
+    public private(set) var infoMessage: String?
 
     private let repository: any AuthRepository
     private var observation: Task<Void, Never>?
@@ -122,6 +130,7 @@ public final class AuthStore {
 
     public func signOut() async {
         errorMessage = nil
+        infoMessage = nil
         isBusy = true
         defer { isBusy = false }
         do {
@@ -132,11 +141,29 @@ public final class AuthStore {
         }
     }
 
+    /// Request a password-reset email. On success surfaces a neutral confirmation
+    /// (we never reveal whether the account exists); on failure surfaces the error.
+    /// Guarded by `isBusy` so it can't overlap another in-flight action.
+    public func sendPasswordReset(email: String) async {
+        guard !isBusy else { return }
+        errorMessage = nil
+        infoMessage = nil
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            try await repository.sendPasswordReset(email: email)
+            infoMessage = "If an account exists, a reset link has been sent."
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+        }
+    }
+
     /// Shared action runner: clears the error, flips `isBusy`, and on success sets
     /// `state` to `.signedIn`. The repository's stream also reflects this, but we
     /// set it directly so callers (and the demo repo) transition deterministically.
     private func perform(_ action: @escaping () async throws -> AuthUser) async {
         errorMessage = nil
+        infoMessage = nil
         isBusy = true
         defer { isBusy = false }
         do {
