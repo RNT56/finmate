@@ -85,7 +85,7 @@ struct SubscriptionDetailView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
                 }
-                .buttonStyle(.borderedProminent)
+                .finmateProminent()
                 .tint(.red)
                 .padding(.top, 4)
             }
@@ -93,7 +93,7 @@ struct SubscriptionDetailView: View {
         }
         .navigationTitle(subscription.name)
         .navigationBarTitleDisplayMode(.inline)
-        .background(FinmateGradient())
+        .background(FinmateBackground())
         .confirmationDialog("Delete \(subscription.name)?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 Task {

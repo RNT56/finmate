@@ -56,6 +56,9 @@ struct FinmateApp: App {
             }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: appLock.isLocked)
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: authStore.state)
+            // App-wide BRONZE accent (Obsidian): drives Color.accentColor / `.tint`
+            // everywhere — active nav/tab, selection, links, toggles, sliders.
+            .tint(FinmateColor.bronze)
             .preferredColorScheme(preferencesStore.appearance.preferredColorScheme)
             .task {
                 await preferencesStore.load()
@@ -99,7 +102,7 @@ struct FinmateApp: App {
 struct SplashView: View {
     var body: some View {
         ZStack {
-            FinmateGradient()
+            FinmateBackground()
             ProgressView().controlSize(.large)
         }
         .ignoresSafeArea()
@@ -237,14 +240,14 @@ final class HomeStore {
                 title: id.title,
                 value: Money(minorUnits: net, currency: displayCurrency).formatted(),
                 detail: net >= 0 ? "Surplus this month" : "Shortfall this month",
-                valueTint: net >= 0 ? .green : .red)
+                valueTint: net >= 0 ? FinmateColor.up : FinmateColor.down)
         case .savingsRate:
             let pct = Int((metrics.savingsRate * 100).rounded())
             return DashboardCardValue(
                 title: id.title,
                 value: "\(pct)%",
                 detail: "of monthly income",
-                valueTint: pct >= 0 ? nil : .red)
+                valueTint: pct >= 0 ? nil : FinmateColor.down)
         case .portfolioValue:
             let gain = portfolioGainMinor
             let gainStr = Money(minorUnits: gain, currency: displayCurrency).formatted()
@@ -296,7 +299,7 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("Finmate")
-            .background(FinmateGradient())
+            .background(FinmateBackground())
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(store.isEditing ? "Done" : "Edit") {
@@ -331,13 +334,14 @@ struct HomeView: View {
 
     private var dashboard: some View {
         ScrollView {
-            VStack(spacing: FinmateTokens.spacing) {
+            VStack(spacing: FinmateSpacing.md) {
                 ForEach(store.layout.cardOrder) { id in
                     DashboardCardView(value: store.value(for: id))
                 }
             }
             .padding()
         }
+        .finmateScrollEdge()
     }
 
     // MARK: Edit mode — reorder (.onMove) + show/hide

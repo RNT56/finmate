@@ -1,124 +1,261 @@
 /* Finmate Liquid Glass — the ONE design language for the web client.
-   CSS backdrop-filter glass mirroring the iOS DesignSystem (docs/06). Tokens are
-   the same semantic roles as the iOS Asset Catalog. No Substimate 9-theme sprawl —
-   light/dark via prefers-color-scheme only. */
+   OBSIDIAN identity: near-monochrome ink / graphite + a single warm BRONZE
+   signature accent on a NEAR-FLAT neutral background. No multi-color gradients;
+   the glass + content carry depth (authentic iOS 26 Liquid Glass). Token VALUES
+   are identical to the iOS Asset Catalog so the two clients match in depth.
+   green = gain / red = loss / BTC-orange stay semantic, never brand.
+   light/dark via prefers-color-scheme + the explicit [data-theme] override. */
 
 :root {
-  /* docs/06 §3.1 semantic color roles — LIGHT */
-  --fm-background: #f2f3f7;
+  /* ---- OBSIDIAN semantic color roles — LIGHT ---- */
+  --fm-background: #f3f3f5;
   --fm-background-elevated: #ffffff;
   --fm-surface: #ffffff;
+  --fm-surface-2: #fafafb;
   --fm-surface-opaque: #ffffff;
   --fm-hairline: rgba(0, 0, 0, 0.08);
-  --fm-label: #0a0a0a;
-  /* Secondary/tertiary opacities raised from iOS's .6/.3 to meet WCAG AA on
-     web glass: secondary now ≈5.1:1 on white (AA normal 4.5:1), tertiary ≈3.4:1
-     (AA large / non-text 3:1) — docs/06 §accessibility, docs/10 M7-A11Y-04. */
-  --fm-label-secondary: rgba(60, 60, 67, 0.75);
+  --fm-label: #0b0c0e;
+  --fm-label-secondary: rgba(60, 60, 67, 0.74);
   --fm-label-tertiary: rgba(60, 60, 67, 0.6);
-  --fm-accent: #0a84ff;
-  --fm-accent-pressed: #0066d6;
 
-  /* docs/06 §3.2 financial semantics */
-  --fm-up: #1f9d55;
-  --fm-down: #d7263d;
+  /* INK — mono primary-action fill (high contrast). */
+  --fm-ink: #1a1c20;
+  --fm-ink-on: #ffffff;
+
+  /* BRONZE — the single signature accent. --fm-accent now == bronze so every
+     existing var(--fm-accent) reference recolors from blue → bronze. */
+  --fm-bronze: #9a7544;
+  --fm-bronze-deep: #7e5f33;
+  --fm-accent: #9a7544;
+  --fm-accent-pressed: #7e5f33;
+
+  /* ---- financial semantics (kept) ---- */
+  --fm-up: #248a3d;
+  --fm-down: #d70015;
+  --fm-positive: #248a3d;
+  --fm-negative: #d70015;
   --fm-neutral: #8a8a8e;
-  --fm-warning: #e8830c;
-  --fm-btc: #f7931a;
-  /* Money-flow palette (docs/06): Subscriptions ≈ violet. */
-  --fm-flow-violet: #8e5cff;
+  --fm-warning: #c8730a;
+  --fm-btc: #e5860f;
 
-  /* docs/06 §5 spacing / radii */
-  --fm-radius: 22px;
-  --fm-radius-sm: 14px;
-  --fm-card-padding: 16px;
-  --fm-spacing: 12px;
+  /* ---- money-flow ramp — mono + bronze (replaces the old violet) ---- */
+  --fm-flow-income: var(--fm-ink);
+  --fm-flow-fixed: #b08a5a;
+  --fm-flow-variable: #cdb089;
+  --fm-flow-subscriptions: #8a6a42;
+  --fm-flow-savings: var(--fm-up);
+  /* Back-compat alias: the old violet token now resolves to a bronze tone. */
+  --fm-flow-violet: #8a6a42;
 
-  /* Glass surface (translucent + blur). On reduce-transparency we fall back below. */
-  --fm-glass-fill: rgba(255, 255, 255, 0.55);
-  --fm-glass-border: rgba(255, 255, 255, 0.6);
+  /* ---- chart bronze→tan monochrome ramp ---- */
+  --fm-ramp-1: #7e5f33;
+  --fm-ramp-2: #9a7544;
+  --fm-ramp-3: #b08a5a;
+  --fm-ramp-4: #c6a479;
+  --fm-ramp-5: #d9c19c;
+  --fm-ramp-6: #e7d6ba;
+
+  /* ---- radii scale ---- */
+  --fm-radius-sm: 12px;
+  --fm-radius-md: 16px;
+  --fm-radius-lg: 22px;
+  --fm-radius-xl: 28px;
+  --fm-radius-pill: 999px;
+  /* legacy aliases mapped onto the new scale */
+  --fm-radius: var(--fm-radius-lg);
+
+  /* ---- spacing scale ---- */
+  --fm-space-1: 4px;
+  --fm-space-2: 8px;
+  --fm-space-3: 12px;
+  --fm-space-4: 16px;
+  --fm-space-5: 20px;
+  --fm-space-6: 24px;
+  --fm-space-7: 32px;
+  --fm-card-padding: var(--fm-space-4);
+  --fm-spacing: var(--fm-space-3);
+
+  /* ---- type ramp (mapped to the platform text styles) ---- */
+  --fm-font-largetitle: 2.125rem;
+  --fm-font-title1: 1.75rem;
+  --fm-font-title2: 1.375rem;
+  --fm-font-title3: 1.1875rem;
+  --fm-font-headline: 1.0625rem;
+  --fm-font-body: 1rem;
+  --fm-font-callout: 0.9375rem;
+  --fm-font-subheadline: 0.9375rem;
+  --fm-font-footnote: 0.8125rem;
+  --fm-font-caption: 0.75rem;
+  --fm-font-caption2: 0.6875rem;
+
+  /* ---- numeric / mono face for amounts (rounded, tabular) ---- */
+  --fm-font-rounded:
+    ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    system-ui, sans-serif;
+
+  /* ---- motion ---- */
+  --fm-motion-fast: 0.15s;
+  --fm-motion-base: 0.25s;
+  --fm-motion-slow: 0.4s;
+  --fm-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ---- glass surface (translucent + blur); reduce-transparency falls back ---- */
+  --fm-glass-fill: rgba(255, 255, 255, 0.62);
+  --fm-glass-border: rgba(255, 255, 255, 0.7);
+  --fm-glass-chrome: rgba(255, 255, 255, 0.72);
+  --fm-glass-thin: rgba(255, 255, 255, 0.42);
   --fm-glass-blur: blur(20px) saturate(180%);
   --fm-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
 
-/* Dark token set, shared by system-dark and the explicit [data-theme="dark"]
-   override the Settings appearance control toggles on <html> (docs/06 §3.1). */
+/* Dark token set — the brand's home mood. Shared by system-dark and the explicit
+   [data-theme="dark"] override the Settings appearance control sets on <html>. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --fm-background: #0b0c0f;
-    --fm-background-elevated: #15171c;
-    --fm-surface: #1b1e25;
-    --fm-surface-opaque: #20232b;
-    --fm-hairline: rgba(255, 255, 255, 0.12);
+    --fm-background: #0b0c0e;
+    --fm-background-elevated: #15171b;
+    --fm-surface: #1b1e23;
+    --fm-surface-2: #23262d;
+    --fm-surface-opaque: #1b1e23;
+    --fm-hairline: rgba(255, 255, 255, 0.1);
     --fm-label: #ffffff;
-    /* Dark secondary already clears AA (≈5.9:1); tertiary raised .3→.5 to
-       reach ≈4.5:1 on the dark surface — docs/10 M7-A11Y-04. */
-    --fm-label-secondary: rgba(235, 235, 245, 0.6);
+    --fm-label-secondary: rgba(235, 235, 245, 0.62);
     --fm-label-tertiary: rgba(235, 235, 245, 0.5);
-    --fm-accent: #0a84ff;
-    --fm-accent-pressed: #3b9bff;
 
-    --fm-up: #30d158;
-    --fm-down: #ff6961;
+    --fm-ink: #f2f3f5;
+    --fm-ink-on: #15161a;
+
+    --fm-bronze: #c29a6a;
+    --fm-bronze-deep: #a07e50;
+    --fm-accent: #c29a6a;
+    --fm-accent-pressed: #a07e50;
+
+    --fm-up: #34c759;
+    --fm-down: #ff453a;
+    --fm-positive: #34c759;
+    --fm-negative: #ff453a;
     --fm-neutral: #98989d;
     --fm-warning: #ffb340;
-    --fm-btc: #ffa62b;
-    --fm-flow-violet: #a989ff;
+    --fm-btc: #f7931a;
 
-    --fm-glass-fill: rgba(28, 30, 38, 0.55);
+    --fm-flow-income: var(--fm-ink);
+    --fm-flow-fixed: #c29a6a;
+    --fm-flow-variable: #ddc49b;
+    --fm-flow-subscriptions: #a07e50;
+    --fm-flow-savings: var(--fm-up);
+    --fm-flow-violet: #a07e50;
+
+    --fm-ramp-1: #a07e50;
+    --fm-ramp-2: #c29a6a;
+    --fm-ramp-3: #d4b083;
+    --fm-ramp-4: #e0c499;
+    --fm-ramp-5: #ead7b6;
+    --fm-ramp-6: #f1e6cf;
+
+    --fm-glass-fill: rgba(255, 255, 255, 0.06);
     --fm-glass-border: rgba(255, 255, 255, 0.12);
+    --fm-glass-chrome: rgba(255, 255, 255, 0.08);
+    --fm-glass-thin: rgba(255, 255, 255, 0.04);
     --fm-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
   }
 }
 
 /* Explicit dark — wins regardless of OS setting (appearance = dark). */
 :root[data-theme='dark'] {
-  --fm-background: #0b0c0f;
-  --fm-background-elevated: #15171c;
-  --fm-surface: #1b1e25;
-  --fm-surface-opaque: #20232b;
-  --fm-hairline: rgba(255, 255, 255, 0.12);
+  --fm-background: #0b0c0e;
+  --fm-background-elevated: #15171b;
+  --fm-surface: #1b1e23;
+  --fm-surface-2: #23262d;
+  --fm-surface-opaque: #1b1e23;
+  --fm-hairline: rgba(255, 255, 255, 0.1);
   --fm-label: #ffffff;
-  --fm-label-secondary: rgba(235, 235, 245, 0.6);
+  --fm-label-secondary: rgba(235, 235, 245, 0.62);
   --fm-label-tertiary: rgba(235, 235, 245, 0.5);
-  --fm-accent: #0a84ff;
-  --fm-accent-pressed: #3b9bff;
 
-  --fm-up: #30d158;
-  --fm-down: #ff6961;
+  --fm-ink: #f2f3f5;
+  --fm-ink-on: #15161a;
+
+  --fm-bronze: #c29a6a;
+  --fm-bronze-deep: #a07e50;
+  --fm-accent: #c29a6a;
+  --fm-accent-pressed: #a07e50;
+
+  --fm-up: #34c759;
+  --fm-down: #ff453a;
+  --fm-positive: #34c759;
+  --fm-negative: #ff453a;
   --fm-neutral: #98989d;
   --fm-warning: #ffb340;
-  --fm-btc: #ffa62b;
-  --fm-flow-violet: #a989ff;
+  --fm-btc: #f7931a;
 
-  --fm-glass-fill: rgba(28, 30, 38, 0.55);
+  --fm-flow-income: var(--fm-ink);
+  --fm-flow-fixed: #c29a6a;
+  --fm-flow-variable: #ddc49b;
+  --fm-flow-subscriptions: #a07e50;
+  --fm-flow-savings: var(--fm-up);
+  --fm-flow-violet: #a07e50;
+
+  --fm-ramp-1: #a07e50;
+  --fm-ramp-2: #c29a6a;
+  --fm-ramp-3: #d4b083;
+  --fm-ramp-4: #e0c499;
+  --fm-ramp-5: #ead7b6;
+  --fm-ramp-6: #f1e6cf;
+
+  --fm-glass-fill: rgba(255, 255, 255, 0.06);
   --fm-glass-border: rgba(255, 255, 255, 0.12);
+  --fm-glass-chrome: rgba(255, 255, 255, 0.08);
+  --fm-glass-thin: rgba(255, 255, 255, 0.04);
   --fm-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
 }
 
 /* Explicit light — forces the light token set even when the OS is dark
    (appearance = light) by restating the :root light defaults. */
 :root[data-theme='light'] {
-  --fm-background: #f2f3f7;
+  --fm-background: #f3f3f5;
   --fm-background-elevated: #ffffff;
   --fm-surface: #ffffff;
+  --fm-surface-2: #fafafb;
   --fm-surface-opaque: #ffffff;
   --fm-hairline: rgba(0, 0, 0, 0.08);
-  --fm-label: #0a0a0a;
-  --fm-label-secondary: rgba(60, 60, 67, 0.75);
+  --fm-label: #0b0c0e;
+  --fm-label-secondary: rgba(60, 60, 67, 0.74);
   --fm-label-tertiary: rgba(60, 60, 67, 0.6);
-  --fm-accent: #0a84ff;
-  --fm-accent-pressed: #0066d6;
 
-  --fm-up: #1f9d55;
-  --fm-down: #d7263d;
+  --fm-ink: #1a1c20;
+  --fm-ink-on: #ffffff;
+
+  --fm-bronze: #9a7544;
+  --fm-bronze-deep: #7e5f33;
+  --fm-accent: #9a7544;
+  --fm-accent-pressed: #7e5f33;
+
+  --fm-up: #248a3d;
+  --fm-down: #d70015;
+  --fm-positive: #248a3d;
+  --fm-negative: #d70015;
   --fm-neutral: #8a8a8e;
-  --fm-warning: #e8830c;
-  --fm-btc: #f7931a;
-  --fm-flow-violet: #8e5cff;
+  --fm-warning: #c8730a;
+  --fm-btc: #e5860f;
 
-  --fm-glass-fill: rgba(255, 255, 255, 0.55);
-  --fm-glass-border: rgba(255, 255, 255, 0.6);
+  --fm-flow-income: var(--fm-ink);
+  --fm-flow-fixed: #b08a5a;
+  --fm-flow-variable: #cdb089;
+  --fm-flow-subscriptions: #8a6a42;
+  --fm-flow-savings: var(--fm-up);
+  --fm-flow-violet: #8a6a42;
+
+  --fm-ramp-1: #7e5f33;
+  --fm-ramp-2: #9a7544;
+  --fm-ramp-3: #b08a5a;
+  --fm-ramp-4: #c6a479;
+  --fm-ramp-5: #d9c19c;
+  --fm-ramp-6: #e7d6ba;
+
+  --fm-glass-fill: rgba(255, 255, 255, 0.62);
+  --fm-glass-border: rgba(255, 255, 255, 0.7);
+  --fm-glass-chrome: rgba(255, 255, 255, 0.72);
+  --fm-glass-thin: rgba(255, 255, 255, 0.42);
   --fm-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
 
@@ -137,10 +274,16 @@ body {
   font-family:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
   color: var(--fm-label);
-  /* Deferential scene gradient so glass reads on top (docs/06 §1.1 depth). */
+  /* NEAR-FLAT background — a single quiet near-solid neutral, no multi-color
+     ambient gradient. Depth comes from the glass + content, not the canvas
+     (OBSIDIAN; iOS 26 Liquid Glass). A whisper-soft single-hue vignette keeps it
+     from reading dead-flat while staying near-monochrome. */
   background:
-    radial-gradient(1200px 800px at 100% -10%, rgba(10, 132, 255, 0.12), transparent 60%),
-    radial-gradient(900px 700px at -10% 110%, rgba(247, 147, 26, 0.1), transparent 55%),
+    radial-gradient(
+      1400px 1000px at 50% -10%,
+      color-mix(in srgb, var(--fm-label) 3%, transparent),
+      transparent 70%
+    ),
     var(--fm-background);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
@@ -154,6 +297,15 @@ body {
   border: 1px solid var(--fm-glass-border);
   border-radius: var(--fm-radius);
   box-shadow: var(--fm-shadow);
+}
+
+/* Glass levels — chrome (nav / toolbars, more opaque) and thin (subtle overlays). */
+.fm-glass-chrome {
+  background: var(--fm-glass-chrome);
+}
+
+.fm-glass-thin {
+  background: var(--fm-glass-thin);
 }
 
 .fm-card {
@@ -176,6 +328,7 @@ body {
 }
 
 .fm-mono {
+  font-family: var(--fm-font-rounded);
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
 }
@@ -217,7 +370,9 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--fm-accent), var(--fm-btc));
+  /* Mono → bronze brand mark (no blue→orange gradient). */
+  background: linear-gradient(135deg, var(--fm-bronze), var(--fm-bronze-deep));
+  box-shadow: 0 0 0 1px var(--fm-glass-border);
 }
 
 .fm-nav-link {
@@ -230,7 +385,9 @@ body {
   text-decoration: none;
   font-weight: 550;
   font-size: 0.9375rem;
-  transition: background 0.18s ease, color 0.18s ease;
+  transition:
+    background var(--fm-motion-fast) ease,
+    color var(--fm-motion-fast) ease;
 }
 
 .fm-nav-link:hover {
@@ -238,12 +395,15 @@ body {
   background: var(--fm-hairline);
 }
 
+/* Active nav uses the bronze accent (tinted fill + bronze label + left rail). */
 .fm-nav-link.active {
   color: var(--fm-label);
-  background: var(--fm-glass-fill);
-  -webkit-backdrop-filter: var(--fm-glass-blur);
-  backdrop-filter: var(--fm-glass-blur);
-  box-shadow: inset 0 0 0 1px var(--fm-glass-border);
+  background: color-mix(in srgb, var(--fm-bronze) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fm-bronze) 30%, transparent);
+}
+
+.fm-nav-link.active .fm-nav-icon {
+  color: var(--fm-bronze);
 }
 
 .fm-nav-icon {
@@ -261,7 +421,7 @@ body {
 }
 
 .fm-page-title {
-  font-size: 1.875rem;
+  font-size: var(--fm-font-title1);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 6px 0 22px;
@@ -327,54 +487,125 @@ body {
 }
 
 .fm-amount {
+  font-family: var(--fm-font-rounded);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- Badges — neutral default + accent / up / down / btc variants ---- */
 .fm-badge {
   font-size: 0.75rem;
   font-weight: 600;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: var(--fm-radius-pill);
   background: var(--fm-hairline);
   color: var(--fm-label-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fm-badge-accent {
+  background: color-mix(in srgb, var(--fm-bronze) 18%, transparent);
+  color: var(--fm-bronze-deep);
+}
+
+.fm-badge-up {
+  background: color-mix(in srgb, var(--fm-up) 18%, transparent);
+  color: var(--fm-up);
+}
+
+.fm-badge-down {
+  background: color-mix(in srgb, var(--fm-down) 18%, transparent);
+  color: var(--fm-down);
+}
+
+.fm-badge-btc {
+  background: color-mix(in srgb, var(--fm-btc) 20%, transparent);
+  color: var(--fm-btc);
+}
+
+/* In dark, bronze-deep is too dark on the tinted chip — use bronze itself. */
+@media (prefers-color-scheme: dark) {
+  .fm-badge-accent {
+    color: var(--fm-bronze);
+  }
+}
+:root[data-theme='dark'] .fm-badge-accent {
+  color: var(--fm-bronze);
 }
 
 .fm-icon-tile {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--fm-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.125rem;
-  background: linear-gradient(135deg, rgba(10, 132, 255, 0.18), rgba(247, 147, 26, 0.18));
-  color: var(--fm-accent);
+  /* Mono / bronze tile (no blue→orange gradient). */
+  background: color-mix(in srgb, var(--fm-bronze) 14%, transparent);
+  color: var(--fm-bronze);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fm-bronze) 22%, transparent);
   flex-shrink: 0;
 }
 
+/* ---- Buttons ---- */
+/* Primary = INK fill (mono, high contrast). */
 .fm-btn {
   font: inherit;
   font-weight: 600;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--fm-radius-pill);
   padding: 10px 18px;
   cursor: pointer;
-  color: #fff;
-  background: var(--fm-accent);
-  transition: background 0.15s ease, transform 0.05s ease;
+  color: var(--fm-ink-on);
+  background: var(--fm-ink);
+  transition:
+    background var(--fm-motion-fast) ease,
+    transform 0.05s ease,
+    box-shadow var(--fm-motion-fast) ease;
 }
 
 .fm-btn:hover {
-  background: var(--fm-accent-pressed);
+  background: color-mix(in srgb, var(--fm-ink) 86%, var(--fm-label-secondary));
 }
 
 .fm-btn:active {
   transform: scale(0.98);
 }
 
+.fm-btn:focus-visible {
+  outline: 2px solid var(--fm-bronze);
+  outline-offset: 2px;
+}
+
+/* Secondary = glass / bordered (no fill). */
+.fm-btn-secondary {
+  color: var(--fm-label);
+  background: var(--fm-glass-fill);
+  -webkit-backdrop-filter: var(--fm-glass-blur);
+  backdrop-filter: var(--fm-glass-blur);
+  box-shadow: inset 0 0 0 1px var(--fm-glass-border);
+}
+
+.fm-btn-secondary:hover {
+  background: var(--fm-hairline);
+}
+
+/* Accent = bronze fill (used for selected segments, brand CTAs). */
+.fm-btn-accent {
+  color: #fff;
+  background: var(--fm-bronze);
+}
+
+.fm-btn-accent:hover {
+  background: var(--fm-bronze-deep);
+}
+
+/* Ghost = bronze text, hairline border. */
 .fm-btn-ghost {
-  color: var(--fm-accent);
+  color: var(--fm-bronze);
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--fm-glass-border);
 }
@@ -383,6 +614,63 @@ body {
   background: var(--fm-hairline);
 }
 
+/* Destructive = red text / tinted. */
+.fm-btn-destructive {
+  color: var(--fm-down);
+  background: color-mix(in srgb, var(--fm-down) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fm-down) 30%, transparent);
+}
+
+.fm-btn-destructive:hover {
+  background: color-mix(in srgb, var(--fm-down) 20%, transparent);
+}
+
+.fm-btn-sm {
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+}
+
+/* ---- Segmented control (bronze selected) ---- */
+.fm-segment {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 3px;
+  border-radius: var(--fm-radius-pill);
+  background: var(--fm-hairline);
+  box-shadow: inset 0 0 0 1px var(--fm-glass-border);
+}
+
+.fm-segment-item {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  border: none;
+  cursor: pointer;
+  padding: 0.375rem 0.875rem;
+  border-radius: var(--fm-radius-pill);
+  color: var(--fm-label-secondary);
+  background: transparent;
+  transition:
+    background var(--fm-motion-fast) ease,
+    color var(--fm-motion-fast) ease;
+}
+
+.fm-segment-item:hover {
+  color: var(--fm-label);
+}
+
+.fm-segment-item[aria-pressed='true'],
+.fm-segment-item.selected {
+  color: #fff;
+  background: var(--fm-bronze);
+}
+
+.fm-segment-item:focus-visible {
+  outline: 2px solid var(--fm-bronze);
+  outline-offset: 2px;
+}
+
+/* ---- Inputs ---- */
 .fm-input,
 .fm-select {
   font: inherit;
@@ -396,8 +684,9 @@ body {
 
 .fm-input:focus,
 .fm-select:focus {
-  outline: 2px solid var(--fm-accent);
+  outline: 2px solid var(--fm-bronze);
   outline-offset: 1px;
+  border-color: transparent;
 }
 
 .fm-field-label {
@@ -430,6 +719,7 @@ body {
 }
 
 .fm-hero-amount {
+  font-family: var(--fm-font-rounded);
   font-size: 2.75rem;
   font-weight: 750;
   letter-spacing: -0.03em;
@@ -444,21 +734,23 @@ body {
   position: relative;
   width: 3.25rem;
   height: 1.875rem;
-  border-radius: 999px;
+  border-radius: var(--fm-radius-pill);
   border: 1px solid var(--fm-glass-border);
   background: var(--fm-hairline);
   cursor: pointer;
   padding: 0;
-  transition: background 0.18s ease;
+  transition: background var(--fm-motion-base) ease;
   flex-shrink: 0;
 }
 
+/* Toggle-on = bronze. */
 .fm-toggle[data-on='true'] {
-  background: var(--fm-up);
+  background: var(--fm-bronze);
+  border-color: var(--fm-bronze);
 }
 
 .fm-toggle:focus-visible {
-  outline: 2px solid var(--fm-accent);
+  outline: 2px solid var(--fm-bronze);
   outline-offset: 2px;
 }
 
@@ -472,7 +764,7 @@ body {
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   transform: translateY(-50%);
-  transition: left 0.18s ease;
+  transition: left var(--fm-motion-base) var(--fm-spring);
 }
 
 .fm-toggle[data-on='true'] .fm-toggle-knob {
@@ -487,11 +779,6 @@ body {
   justify-content: space-between;
   gap: var(--fm-spacing);
   flex-wrap: wrap;
-}
-
-.fm-btn-sm {
-  padding: 6px 14px;
-  font-size: 0.8125rem;
 }
 
 .fm-dash-editrow {
@@ -520,7 +807,7 @@ body {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  transition: background 0.15s ease;
+  transition: background var(--fm-motion-fast) ease;
 }
 
 .fm-iconbtn:hover:not(:disabled) {
@@ -528,7 +815,7 @@ body {
 }
 
 .fm-iconbtn:focus-visible {
-  outline: 2px solid var(--fm-accent);
+  outline: 2px solid var(--fm-bronze);
   outline-offset: 1px;
 }
 
@@ -542,7 +829,7 @@ body {
 }
 
 .fm-dash-card-drop {
-  box-shadow: inset 0 0 0 2px var(--fm-accent);
+  box-shadow: inset 0 0 0 2px var(--fm-bronze);
 }
 
 .fm-dash-card[draggable='true'] {
@@ -655,6 +942,7 @@ body {
   .fm-toggle-knob,
   .fm-nav-link,
   .fm-btn,
+  .fm-segment-item,
   .fm-iconbtn {
     transition: none;
   }
@@ -698,4 +986,87 @@ body {
   border-radius: 10px;
   padding: 0.625rem 0.75rem;
   font-size: 0.8125rem;
+}
+
+/* ---- Styleguide (web mirror of the iOS DesignSystem gallery) ---- */
+.fm-sg-section {
+  margin-bottom: var(--fm-space-7);
+}
+
+.fm-sg-heading {
+  font-size: var(--fm-font-title3);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--fm-space-3);
+}
+
+.fm-sg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--fm-space-3);
+}
+
+.fm-sg-swatch {
+  border-radius: var(--fm-radius-md);
+  padding: var(--fm-space-3);
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  box-shadow: inset 0 0 0 1px var(--fm-hairline);
+  font-size: 0.75rem;
+}
+
+.fm-sg-swatch-name {
+  font-weight: 650;
+}
+
+.fm-sg-swatch-val {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.fm-sg-rampbar {
+  display: flex;
+  height: 40px;
+  border-radius: var(--fm-radius-sm);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--fm-hairline);
+}
+
+.fm-sg-rampbar > span {
+  flex: 1;
+}
+
+.fm-sg-clusters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fm-space-3);
+  align-items: center;
+}
+
+.fm-sg-radius-demo {
+  width: 72px;
+  height: 56px;
+  background: var(--fm-bronze);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.fm-sg-type-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fm-space-3);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--fm-hairline);
+}
+
+.fm-sg-type-label {
+  color: var(--fm-label-tertiary);
+  font-size: 0.6875rem;
+  min-width: 90px;
 }

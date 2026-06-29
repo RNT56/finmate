@@ -233,7 +233,7 @@ struct SettingsView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(FinmateGradient())
+        .background(FinmateBackground())
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingExport) {
@@ -373,13 +373,13 @@ struct ExportDataView: View {
                     Label("Share export", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .finmateProminent()
                 .controlSize(.large)
                 Spacer()
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(FinmateGradient())
+            .background(FinmateBackground())
             .navigationTitle("Export data")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

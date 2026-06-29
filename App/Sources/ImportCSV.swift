@@ -246,7 +246,7 @@ struct ImportView: View {
         }
         .navigationTitle("Import CSV")
         .navigationBarTitleDisplayMode(.inline)
-        .background(FinmateGradient())
+        .background(FinmateBackground())
         .fileImporter(
             isPresented: $isImportingFile,
             allowedContentTypes: [.commaSeparatedText, .plainText],
@@ -522,14 +522,14 @@ struct ImportView: View {
                     } label: {
                         Label("Choose .csv file", systemImage: "folder")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .finmateProminent()
                     Button {
                         csvText = kind.sampleCSV
                         analyzeHeader()
                     } label: {
                         Label("Load sample", systemImage: "doc.text")
                     }
-                    .buttonStyle(.bordered)
+                    .finmateGlassButton()
                 }
             }
             .frame(maxWidth: .infinity)
@@ -562,7 +562,7 @@ struct ImportView: View {
                     } label: {
                         Label("Choose file", systemImage: "folder")
                     }
-                    .buttonStyle(.bordered)
+                    .finmateGlassButton()
 
                     Button {
                         csvText = kind.sampleCSV
@@ -570,7 +570,7 @@ struct ImportView: View {
                     } label: {
                         Label("Sample", systemImage: "doc.text")
                     }
-                    .buttonStyle(.bordered)
+                    .finmateGlassButton()
 
                     Spacer()
 
@@ -579,7 +579,7 @@ struct ImportView: View {
                     } label: {
                         Label("Map columns", systemImage: "tablecells")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .finmateProminent()
                     .disabled(csvText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
@@ -632,7 +632,7 @@ struct ImportView: View {
                     Label("Preview rows", systemImage: "eye")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .finmateProminent()
                 .controlSize(.large)
                 .disabled(!requiredFieldsMapped)
             }
@@ -744,7 +744,7 @@ struct ImportView: View {
                       systemImage: "square.and.arrow.down")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .finmateProminent()
             .controlSize(.large)
             .disabled(preview.validCount == 0)
 
@@ -758,7 +758,7 @@ struct ImportView: View {
                           systemImage: "line.3.horizontal.decrease.circle")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .finmateGlassButton()
                 .controlSize(.large)
                 .disabled(preview.nonDuplicateCount == 0)
             }

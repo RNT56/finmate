@@ -28,14 +28,15 @@ import { usePreferences } from '../settings/usePreferences';
 
 const DISPLAY_CURRENCIES: CurrencyCode[] = ['EUR', 'USD', 'BTC'];
 
-// Stable per-type palette drawn from the glass tokens (docs/06 §3.2).
+// Stable per-type palette — OBSIDIAN bronze→tan monochrome ramp for the
+// allocation donut, with BTC-orange kept semantic for crypto (docs/06 §3.2).
 const TYPE_COLOR: Record<AssetType, string> = {
   crypto: 'var(--fm-btc)',
-  stock: 'var(--fm-accent)',
-  etf: 'var(--fm-flow-violet)',
-  cash: 'var(--fm-up)',
-  savings: 'var(--fm-warning)',
-  real_estate: 'var(--fm-down)',
+  stock: 'var(--fm-ramp-2)',
+  etf: 'var(--fm-ramp-3)',
+  cash: 'var(--fm-ramp-4)',
+  savings: 'var(--fm-ramp-1)',
+  real_estate: 'var(--fm-ramp-5)',
   other: 'var(--fm-neutral)',
 };
 
@@ -300,17 +301,12 @@ function CurrencySwitcher({
   onChange: (c: CurrencyCode) => void;
 }) {
   return (
-    <div
-      role="group"
-      aria-label="Display currency"
-      style={{ display: 'flex', gap: 6 }}
-    >
+    <div className="fm-segment" role="group" aria-label="Display currency">
       {DISPLAY_CURRENCIES.map((c) => (
         <button
           key={c}
           type="button"
-          className={c === value ? 'fm-btn' : 'fm-btn fm-btn-ghost'}
-          style={{ padding: '6px 12px', fontSize: 13 }}
+          className="fm-segment-item"
           aria-pressed={c === value}
           onClick={() => onChange(c)}
         >

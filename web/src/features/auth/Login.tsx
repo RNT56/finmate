@@ -222,12 +222,11 @@ export function Login() {
         {/* Prominent demo entry — always works, no backend needed. */}
         <button
           type="button"
-          className="fm-btn"
+          className="fm-btn fm-btn-accent"
           style={{
             width: '100%',
             justifyContent: 'center',
             marginTop: '1rem',
-            background: 'var(--fm-accent)',
             fontWeight: 700,
           }}
           aria-label="Try the demo without an account"

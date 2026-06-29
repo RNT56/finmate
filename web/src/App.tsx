@@ -11,6 +11,7 @@ import { Assets } from './features/assets/Assets';
 import { Calculator } from './features/calculator/Calculator';
 import { Import } from './features/import/Import';
 import { Settings } from './features/settings/Settings';
+import { Styleguide } from './features/styleguide/Styleguide';
 import { AuthProvider, useAuth } from './features/auth/useAuth';
 import { Login } from './features/auth/Login';
 import { Onboarding } from './features/auth/Onboarding';
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
       { path: 'calculator', element: <Calculator /> },
       { path: 'import', element: <Import /> },
       { path: 'settings', element: <Settings /> },
+      { path: 'styleguide', element: <Styleguide /> },
       { path: '*', element: <Placeholder title="Not found" /> },
     ],
   },

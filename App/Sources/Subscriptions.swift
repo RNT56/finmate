@@ -131,8 +131,7 @@ struct SubscriptionsListView: View {
                     } description: {
                         Text("Track your recurring charges to see spending by category.")
                     } actions: {
-                        Button { showingAdd = true } label: { Label("Add subscription", systemImage: "plus") }
-                            .buttonStyle(.borderedProminent)
+                        GlassButton("Add subscription", systemImage: "plus") { showingAdd = true }
                     }
                 } else {
                     subscriptionsList
@@ -185,7 +184,7 @@ struct SubscriptionsListView: View {
                 }
                 await store.load()
             }
-            .background(FinmateGradient())
+            .background(FinmateBackground())
         }
     }
 

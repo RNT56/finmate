@@ -191,18 +191,20 @@ final class AssetsStore {
 // MARK: - Color helper for asset types
 
 enum AssetPalette {
+    /// Asset-type colors drawn from the Obsidian bronze→tan ramp, with BTC keeping its
+    /// semantic orange. Cash/savings read as up-green (liquid), other as neutral.
     static func color(for type: AssetType) -> Color {
         switch type {
-        case .crypto:     return .orange
-        case .stock:      return .blue
-        case .etf:        return .purple
-        case .cash:       return .green
-        case .savings:    return .teal
-        case .realEstate: return .brown
-        case .other:      return .gray
+        case .crypto:     return FinmateColor.btc
+        case .stock:      return FinmateColor.bronze
+        case .etf:        return FinmateColor.bronzeDeep
+        case .cash:       return FinmateColor.up
+        case .savings:    return Color(hex: 0xCDB089)
+        case .realEstate: return Color(hex: 0x8A6A42)
+        case .other:      return FinmateColor.neutral
         }
     }
-    static func gainColor(_ minor: Int64) -> Color { minor >= 0 ? .green : .red }
+    static func gainColor(_ minor: Int64) -> Color { minor >= 0 ? FinmateColor.up : FinmateColor.down }
 }
 
 // MARK: - Views
@@ -229,8 +231,7 @@ struct AssetsView: View {
                     } description: {
                         Text("Add an asset to track your portfolio value and allocation.")
                     } actions: {
-                        Button { addingAsset = true } label: { Label("Add asset", systemImage: "plus") }
-                            .buttonStyle(.borderedProminent)
+                        GlassButton("Add asset", systemImage: "plus") { addingAsset = true }
                     }
                     .padding(.top, 24)
                 } else {
@@ -244,7 +245,7 @@ struct AssetsView: View {
         }
         .navigationTitle("Assets")
         .navigationBarTitleDisplayMode(.large)
-        .background(FinmateGradient())
+        .background(FinmateBackground())
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { addingAsset = true } label: { Image(systemName: "plus") }
@@ -281,7 +282,7 @@ struct AssetsView: View {
                 Text("\(code.symbol) \(code.rawValue)").tag(code)
             }
         }
-        .pickerStyle(.segmented)
+        .finmateSegmented()
         .accessibilityLabel("Display currency")
     }
 
@@ -511,7 +512,7 @@ struct AssetDetailView: View {
         }
         .navigationTitle(asset.name)
         .navigationBarTitleDisplayMode(.inline)
-        .background(FinmateGradient())
+        .background(FinmateBackground())
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { recordingTxn = true } label: { Image(systemName: "plus") }

@@ -286,13 +286,12 @@ function SegmentedControl<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div role="group" aria-label={groupLabel} style={{ display: 'flex', gap: '0.375rem' }}>
+    <div className="fm-segment" role="group" aria-label={groupLabel}>
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
-          className={opt.value === value ? 'fm-btn' : 'fm-btn fm-btn-ghost'}
-          style={{ padding: '0.375rem 0.75rem', fontSize: '0.8125rem' }}
+          className="fm-segment-item"
           aria-pressed={opt.value === value}
           onClick={() => onChange(opt.value)}
         >

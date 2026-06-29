@@ -38,6 +38,12 @@ const ITEMS: MoreItem[] = [
     title: 'Settings',
     subtitle: 'Appearance, default currency, reminders, privacy, and data',
   },
+  {
+    to: '/styleguide',
+    icon: '◐',
+    title: 'Styleguide',
+    subtitle: 'OBSIDIAN tokens and components — the design-system gallery',
+  },
 ];
 
 export function More() {

@@ -90,13 +90,13 @@ function Segmented<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div role="group" aria-label={groupLabel} style={{ display: 'flex', gap: '0.375rem' }}>
+    <div className="fm-segment" role="group" aria-label={groupLabel} style={{ display: 'flex' }}>
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
-          className={opt.value === value ? 'fm-btn' : 'fm-btn fm-btn-ghost'}
-          style={{ flex: 1, justifyContent: 'center', padding: '0.5rem 0.75rem' }}
+          className="fm-segment-item"
+          style={{ flex: 1 }}
           aria-pressed={opt.value === value}
           onClick={() => onChange(opt.value)}
         >
