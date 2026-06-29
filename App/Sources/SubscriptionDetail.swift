@@ -69,11 +69,13 @@ struct SubscriptionDetailView: View {
                                 Text(urlString).font(.caption).foregroundStyle(.secondary)
                                 Image(systemName: "arrow.up.right.square")
                                     .foregroundStyle(.tint)
+                                    .accessibilityHidden(true)
                             }
                         }
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open \(subscription.name) website in Safari")
+                    .accessibilityHint("Opens in Safari")
                 }
 
                 Button(role: .destructive) {
@@ -122,6 +124,8 @@ struct SubscriptionDetailView: View {
                 }
                 Spacer()
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(subscription.name), \(subscription.monthlyAmount.formatted()) per month")
         }
     }
 

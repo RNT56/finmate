@@ -268,3 +268,39 @@ public enum CryptoCalculator {
         return CryptoConversion(fiat: fiat, btc: btc)
     }
 }
+
+// MARK: - CryptoCalculatorModel (M5-CALC-03) — pure compute + input validation
+
+/// A pure, testable model for the BTC calculator screen. It owns the raw fiat
+/// input string + source currency and exposes the BTC/sats conversion (or `nil`
+/// on empty/invalid/negative/over-precision input) against an injected converter,
+/// so the View renders identically while the logic is unit-tested in isolation.
+public struct CryptoCalculatorModel: Sendable {
+    public let converter: CurrencyConverter
+
+    public init(converter: CurrencyConverter) {
+        self.converter = converter
+    }
+
+    /// Parse a raw fiat string into `Money`, or `nil` if it is empty, not a
+    /// number, negative, or carries more fractional digits than the currency
+    /// allows. Whitespace is trimmed first.
+    public func parseFiat(_ raw: String, currency: CurrencyCode) -> Money? {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+        return try? Money.parse(trimmed, currency: currency)
+    }
+
+    /// Convert a raw fiat string to a `CryptoConversion`, or `nil` when the
+    /// input is invalid (see `parseFiat`) or no rate is available.
+    public func conversion(for raw: String, currency: CurrencyCode) -> CryptoConversion? {
+        guard let fiat = parseFiat(raw, currency: currency) else { return nil }
+        return try? CryptoCalculator.fiatToBTC(fiat, converter: converter)
+    }
+
+    /// The "1 ₿ = …" display rate `Money` for the given fiat currency, or `nil`
+    /// if the BTC→fiat rate is unavailable.
+    public func rateMoney(for currency: CurrencyCode) -> Money? {
+        try? converter.convert(Money(minorUnits: satsPerBTC, currency: .btc), to: currency)
+    }
+}

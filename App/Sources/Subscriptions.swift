@@ -195,12 +195,15 @@ struct SubscriptionsListView: View {
                 NavigationLink(value: sub.id) {
                     SubscriptionRow(subscription: sub)
                 }
+                .accessibilityHint("Opens subscription details")
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
                         Task { await store.delete(id: sub.id) }
                     } label: { Label("Delete", systemImage: "trash") }
+                    .accessibilityLabel("Delete \(sub.name)")
+                    .accessibilityHint("Removes this subscription")
                 }
             }
             .onMove { offsets, destination in
