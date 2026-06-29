@@ -215,15 +215,15 @@ struct ImportView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: FinmateTokens.spacing) {
+            VStack(spacing: FinmateSpacing.md) {
                 typePickerCard
                 if isInitial { initialEmptyState }
                 editorCard
                 if let fileError {
                     GlassCard {
                         Label(fileError, systemImage: "exclamationmark.triangle.fill")
-                            .font(.subheadline)
-                            .foregroundStyle(.red)
+                            .font(FinmateType.subheadline)
+                            .foregroundStyle(FinmateColor.down)
                     }
                 }
                 if headerAnalyzed { mappingCard }
@@ -237,8 +237,8 @@ struct ImportView: View {
                     GlassCard {
                         Label("Imported \(importedCount) \(kind.singular)\(importedCount == 1 ? "" : "s").",
                               systemImage: "checkmark.circle.fill")
-                            .font(.subheadline)
-                            .foregroundStyle(.green)
+                            .font(FinmateType.subheadline)
+                            .foregroundStyle(FinmateColor.up)
                     }
                 }
             }
@@ -281,15 +281,15 @@ struct ImportView: View {
 
     private var typePickerCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.sm) {
                 Text("Import type")
-                    .font(.headline)
+                    .font(FinmateType.headline)
                 Picker("Import type", selection: $kind) {
                     ForEach(ImportKind.allCases) { k in
                         Text(k.title).tag(k)
                     }
                 }
-                .pickerStyle(.segmented)
+                .finmateSegmented()
                 .accessibilityLabel("Import type")
                 .onChange(of: kind) { _, _ in
                     // Switching type invalidates the mapping/preview built for the old one.
@@ -505,16 +505,16 @@ struct ImportView: View {
 
     private var initialEmptyState: some View {
         GlassCard {
-            VStack(spacing: 10) {
+            VStack(spacing: FinmateSpacing.md) {
                 Image(systemName: "square.and.arrow.down.on.square")
                     .font(.largeTitle)
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(FinmateColor.bronze)
                     .accessibilityHidden(true)
                 Text("Import \(kind.title.lowercased())")
-                    .font(.headline)
+                    .font(FinmateType.headline)
                 Text("Choose a .csv file or paste CSV below, map the columns, then import the valid rows.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(FinmateType.subheadline)
+                    .foregroundStyle(FinmateColor.labelSecondary)
                     .multilineTextAlignment(.center)
                 HStack {
                     Button {
@@ -541,19 +541,19 @@ struct ImportView: View {
 
     private var editorCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
                 Text("CSV source")
-                    .font(.headline)
+                    .font(FinmateType.headline)
                 Text("Columns: \(kind.columnsHint). Header aliases are detected automatically; map any columns that don't match below.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(FinmateType.caption)
+                    .foregroundStyle(FinmateColor.labelSecondary)
 
                 TextEditor(text: $csvText)
                     .font(.system(.footnote, design: .monospaced))
                     .frame(minHeight: 160)
                     .scrollContentBackground(.hidden)
-                    .padding(8)
-                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                    .padding(FinmateSpacing.sm)
+                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: FinmateRadius.sm))
                     .accessibilityLabel("CSV input")
 
                 HStack {
@@ -590,21 +590,21 @@ struct ImportView: View {
 
     private var mappingCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
                 Label("Map columns", systemImage: "tablecells")
-                    .font(.headline)
+                    .font(FinmateType.headline)
                 Text("Detected \(headers.count) column\(headers.count == 1 ? "" : "s"). Match each Finmate field to a column. Required fields are marked.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(FinmateType.caption)
+                    .foregroundStyle(FinmateColor.labelSecondary)
 
                 ForEach(kind.fields, id: \.key) { field in
                     HStack {
                         Text(field.name)
-                            .font(.subheadline.weight(.medium))
+                            .font(FinmateType.subheadline.weight(.medium))
                         if field.required {
                             Text("Required")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.orange)
+                                .font(FinmateType.caption2.weight(.semibold))
+                                .foregroundStyle(FinmateColor.warning)
                         }
                         Spacer()
                         Picker(field.name, selection: columnBinding(for: field.key)) {
@@ -622,8 +622,8 @@ struct ImportView: View {
 
                 if !requiredFieldsMapped {
                     Label("Map all required fields to continue.", systemImage: "exclamationmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                        .font(FinmateType.caption)
+                        .foregroundStyle(FinmateColor.warning)
                 }
 
                 Button {
@@ -644,59 +644,55 @@ struct ImportView: View {
     private func previewSummaryCard(_ preview: UnifiedPreview) -> some View {
         GlassCard {
             HStack {
-                summaryStat(value: preview.validCount, label: "Valid", color: .green)
+                summaryStat(value: preview.validCount, label: "Valid", color: FinmateColor.up)
                 Divider().frame(height: 32)
-                summaryStat(value: preview.errors.count, label: "Errors", color: preview.errors.isEmpty ? .secondary : .red)
+                summaryStat(value: preview.errors.count, label: "Errors", color: preview.errors.isEmpty ? FinmateColor.labelSecondary : FinmateColor.down)
                 Divider().frame(height: 32)
-                summaryStat(value: preview.totalRows, label: "Rows", color: .secondary)
+                summaryStat(value: preview.totalRows, label: "Rows", color: FinmateColor.labelSecondary)
             }
             .accessibilityElement(children: .combine)
         }
     }
 
     private func summaryStat(value: Int, label: String, color: Color) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: FinmateSpacing.xs / 2) {
             Text("\(value)")
-                .font(.system(.title2, design: .rounded).weight(.bold))
+                .font(FinmateType.money(.title2, weight: .bold))
                 .foregroundStyle(color)
-            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(label).font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
         }
         .frame(maxWidth: .infinity)
     }
 
     private func validRowsCard(_ preview: UnifiedPreview) -> some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
                 HStack {
-                    Text("Valid rows").font(.headline)
+                    Text("Valid rows").font(FinmateType.headline)
                     Spacer()
                     if preview.duplicateCount > 0 {
                         Label("\(preview.duplicateCount) possible duplicate\(preview.duplicateCount == 1 ? "" : "s")",
                               systemImage: "exclamationmark.arrow.triangle.2.circlepath")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.orange)
+                            .font(FinmateType.caption.weight(.semibold))
+                            .foregroundStyle(FinmateColor.warning)
                             .accessibilityLabel("\(preview.duplicateCount) possible duplicate rows")
                     }
                 }
                 ForEach(preview.rows) { row in
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text(row.title).font(.subheadline.weight(.medium))
+                        VStack(alignment: .leading, spacing: FinmateSpacing.xs / 2) {
+                            HStack(spacing: FinmateSpacing.xs + 2) {
+                                Text(row.title).font(FinmateType.subheadline.weight(.medium))
                                 if row.isDuplicate {
-                                    Text("Possible duplicate")
-                                        .font(.caption2.weight(.semibold))
-                                        .padding(.horizontal, 6).padding(.vertical, 2)
-                                        .background(.orange.opacity(0.18), in: Capsule())
-                                        .foregroundStyle(.orange)
+                                    Badge(text: "Possible duplicate", tone: .warning)
                                 }
                             }
                             Text(row.subtitle)
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
                         }
                         Spacer()
                         Text(row.amount.formatted())
-                            .font(.subheadline.monospacedDigit())
+                            .font(FinmateType.money(.subheadline, weight: .regular))
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(
@@ -709,17 +705,17 @@ struct ImportView: View {
 
     private func errorsCard(_ preview: UnifiedPreview) -> some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
                 Label("Errors", systemImage: "exclamationmark.triangle.fill")
-                    .font(.headline).foregroundStyle(.red)
+                    .font(FinmateType.headline).foregroundStyle(FinmateColor.down)
                 ForEach(Array(preview.errors.enumerated()), id: \.offset) { _, err in
-                    HStack(alignment: .top, spacing: 8) {
+                    HStack(alignment: .top, spacing: FinmateSpacing.sm) {
                         Text("Row \(err.row)")
-                            .font(.caption.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .font(FinmateType.money(.caption, weight: .semibold))
+                            .foregroundStyle(FinmateColor.labelSecondary)
                             .frame(width: 56, alignment: .leading)
                         Text(errorText(err))
-                            .font(.caption)
+                            .font(FinmateType.caption)
                     }
                     .accessibilityElement(children: .combine)
                 }
@@ -734,7 +730,7 @@ struct ImportView: View {
 
     @ViewBuilder
     private func importButton(_ preview: UnifiedPreview) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: FinmateSpacing.md) {
             // Default action: import ALL valid rows (the duplicate hint is advisory).
             Button {
                 guard let pending else { return }

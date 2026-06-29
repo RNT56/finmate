@@ -63,8 +63,12 @@ enum FinmateColor {
     static let labelSecondary = Color.secondary
     static let labelTertiary  = Color(uiColor: .tertiaryLabel)
 
-    // Signature accent.
-    static let bronze     = Color.dynamicHex(light: 0x9A7544, dark: 0xC29A6A)
+    // Signature accent. The LIGHT bronze is tuned to 0x8A6A3C so on-surface text
+    // (links, ghost buttons, selected nav) meets WCAG AA: 4.99:1 on white and
+    // 4.5:1 on the app background (was 0x9A7544 → 4.2/3.79, below AA normal text).
+    // Dark bronze (0xC29A6A) already clears AA (≥6.4:1). Values stay identical to
+    // the web client's tokens (docs/06 §G).
+    static let bronze     = Color.dynamicHex(light: 0x8A6A3C, dark: 0xC29A6A)
     static let bronzeDeep = Color.dynamicHex(light: 0x7E5F33, dark: 0xA07E50)
 
     /// Mono primary-action fill (high contrast) + its foreground.

@@ -29,15 +29,15 @@ struct CalculatorView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: FinmateTokens.spacing) {
+            VStack(spacing: FinmateSpacing.md) {
                 inputCard
                 resultCard
                 GlassCard {
                     HStack {
                         Label("Rate", systemImage: "arrow.left.arrow.right")
-                            .font(.subheadline).foregroundStyle(.secondary)
+                            .font(FinmateType.subheadline).foregroundStyle(FinmateColor.labelSecondary)
                         Spacer()
-                        Text(rateText).font(.subheadline.monospacedDigit())
+                        Text(rateText).font(FinmateType.money(.subheadline, weight: .regular))
                     }
                     .accessibilityElement(children: .combine)
                 }
@@ -51,12 +51,12 @@ struct CalculatorView: View {
 
     private var inputCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Amount").font(.subheadline).foregroundStyle(.secondary)
-                HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
+                Text("Amount").font(FinmateType.subheadline).foregroundStyle(FinmateColor.labelSecondary)
+                HStack(spacing: FinmateSpacing.md) {
                     TextField("0", text: $amount)
                         .keyboardType(.decimalPad)
-                        .font(.system(.title2, design: .rounded).weight(.semibold))
+                        .font(FinmateType.money(.title2))
                         .accessibilityLabel("Fiat amount")
                         .accessibilityHint("Amount to convert to bitcoin")
                         .onChange(of: amount) { _, newValue in
@@ -72,7 +72,7 @@ struct CalculatorView: View {
                     .onChange(of: fiatCurrency) { _, _ in validate(amount) }
                 }
                 if let parseError {
-                    Text(parseError).font(.caption).foregroundStyle(.red)
+                    Text(parseError).font(FinmateType.caption).foregroundStyle(FinmateColor.down)
                 }
             }
         }
@@ -80,14 +80,14 @@ struct CalculatorView: View {
 
     private var resultCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Equivalent").font(.subheadline).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
+                Text("Equivalent").font(FinmateType.subheadline).foregroundStyle(FinmateColor.labelSecondary)
                 if let conversion {
                     HStack {
-                        Image(systemName: "bitcoinsign.circle.fill").foregroundStyle(.orange)
+                        Image(systemName: "bitcoinsign.circle.fill").foregroundStyle(FinmateColor.btc)
                             .accessibilityHidden(true)
                         Text(conversion.btc.formatted())
-                            .font(.system(.title, design: .rounded).weight(.bold))
+                            .font(FinmateType.money(.title, weight: .bold))
                             .contentTransition(.numericText())
                             .minimumScaleFactor(0.6)
                             .lineLimit(1)
@@ -96,14 +96,14 @@ struct CalculatorView: View {
                     .accessibilityLabel("Equivalent \(conversion.btc.formatted())")
                     Divider()
                     HStack {
-                        Text("Satoshis").foregroundStyle(.secondary)
+                        Text("Satoshis").font(FinmateType.body).foregroundStyle(FinmateColor.labelSecondary)
                         Spacer()
-                        Text(satsText(conversion.sats)).font(.body.monospacedDigit().weight(.medium))
+                        Text(satsText(conversion.sats)).font(FinmateType.money(.body, weight: .medium))
                     }
                     .accessibilityElement(children: .combine)
                 } else {
                     Text("Enter a fiat amount to convert.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(FinmateType.subheadline).foregroundStyle(FinmateColor.labelSecondary)
                 }
             }
         }

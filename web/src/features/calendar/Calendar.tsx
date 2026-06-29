@@ -127,7 +127,7 @@ export function Calendar() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: 16,
+              marginBottom: 'var(--fm-space-4)',
             }}
           >
             <NavButton
@@ -138,7 +138,10 @@ export function Calendar() {
                 goPrevMonth();
               }}
             />
-            <div style={{ fontWeight: 700, fontSize: 18 }} aria-live="polite">
+            <div
+              style={{ fontWeight: 700, fontSize: 'var(--fm-font-title3)' }}
+              aria-live="polite"
+            >
               {MONTHS[view.month - 1]} {view.year}
             </div>
             <NavButton
@@ -159,7 +162,7 @@ export function Calendar() {
               // minmax(0, …) lets the 7 day columns shrink below their content
               // width at large Dynamic-Type sizes instead of forcing H-scroll.
               gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-              gap: 6,
+              gap: 'var(--fm-space-1)',
             }}
           >
             {WEEKDAYS.map((w) => (
@@ -169,9 +172,9 @@ export function Calendar() {
                 className="fm-secondary"
                 style={{
                   textAlign: 'center',
-                  fontSize: 12,
+                  fontSize: 'var(--fm-font-caption)',
                   fontWeight: 600,
-                  paddingBottom: 4,
+                  paddingBottom: 'var(--fm-space-1)',
                 }}
               >
                 {w}
@@ -191,13 +194,17 @@ export function Calendar() {
                   key={cell.day}
                   role="gridcell"
                   type="button"
+                  className="fm-cal-day"
                   onClick={() => setSelectedDay(cell.day)}
                   aria-pressed={isSelected}
                   aria-label={`${MONTHS[view.month - 1]} ${cell.day}, ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}`}
                   style={dayCellStyle(isSelected)}
                 >
                   <span
-                    style={{ fontSize: 14, fontWeight: isSelected ? 700 : 500 }}
+                    style={{
+                      fontSize: 'var(--fm-font-callout)',
+                      fontWeight: isSelected ? 700 : 500,
+                    }}
                   >
                     {cell.day}
                   </span>
@@ -234,20 +241,24 @@ export function Calendar() {
         <GlassCard>
           <div
             className="fm-secondary"
-            style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}
+            style={{
+              fontWeight: 600,
+              fontSize: 'var(--fm-font-subheadline)',
+              marginBottom: 'var(--fm-space-2)',
+            }}
           >
             {validSelection === null
               ? 'Select a day'
               : `${MONTHS[view.month - 1]} ${validSelection}, ${view.year}`}
           </div>
           {validSelection === null ? (
-            <div className="fm-secondary" style={{ padding: '8px 0' }}>
+            <div className="fm-secondary" style={{ padding: 'var(--fm-space-2) 0' }}>
               {monthHasEvents
-                ? 'Tap a day to see its income, subscriptions and bills.'
+                ? 'Select a day to see its income, subscriptions and bills.'
                 : 'Nothing scheduled this month. Add income, subscriptions, or bills to see them here.'}
             </div>
           ) : selectedEvents.length === 0 ? (
-            <div className="fm-secondary" style={{ padding: '8px 0' }}>
+            <div className="fm-secondary" style={{ padding: 'var(--fm-space-2) 0' }}>
               No events on this day.
             </div>
           ) : (
@@ -259,13 +270,13 @@ export function Calendar() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 0',
+                    padding: 'var(--fm-space-2) 0',
                     borderTop:
-                      i === 0 ? 'none' : '1px solid var(--fm-glass-border)',
+                      i === 0 ? 'none' : '1px solid var(--fm-hairline)',
                   }}
                 >
                   <span
-                    style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 'var(--fm-space-2)' }}
                   >
                     <span
                       aria-hidden="true"
@@ -280,7 +291,7 @@ export function Calendar() {
                       <span style={{ fontWeight: 600 }}>{e.title}</span>
                       <span
                         className="fm-secondary"
-                        style={{ display: 'block', fontSize: 12 }}
+                        style={{ display: 'block', fontSize: 'var(--fm-font-caption)' }}
                       >
                         {KIND_LABEL[e.kind]}
                       </span>
@@ -299,7 +310,10 @@ export function Calendar() {
               ))}
             </ul>
           )}
-          <div className="fm-secondary" style={{ fontSize: 12, marginTop: 10 }}>
+          <div
+            className="fm-secondary"
+            style={{ fontSize: 'var(--fm-font-caption)', marginTop: 'var(--fm-space-2)' }}
+          >
             Reminders are delivered as local notifications on iPhone. Remote
             push is post-v1.
           </div>
@@ -319,8 +333,8 @@ function dayCellStyle(selected: boolean): CSSProperties {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 4,
-    padding: '8px 0 6px',
+    gap: 'var(--fm-space-1)',
+    padding: 'var(--fm-space-2) 0 var(--fm-space-1)',
     borderRadius: 'var(--fm-radius-sm)',
     border: selected ? '1px solid var(--fm-accent)' : '1px solid transparent',
     background: selected
@@ -344,18 +358,14 @@ function NavButton({
   return (
     <button
       type="button"
+      className="fm-iconbtn"
       aria-label={label}
       onClick={onClick}
       style={{
         width: 36,
         height: 36,
         borderRadius: 'var(--fm-radius-sm)',
-        border: '1px solid var(--fm-glass-border)',
-        background: 'var(--fm-glass-fill)',
-        color: 'var(--fm-label)',
-        cursor: 'pointer',
-        fontSize: 20,
-        lineHeight: 1,
+        fontSize: 'var(--fm-font-title3)',
       }}
     >
       {glyph}
@@ -366,11 +376,18 @@ function NavButton({
 function Legend() {
   const items: EventKind[] = ['income', 'subscription', 'fixedExpense'];
   return (
-    <div style={{ display: 'flex', gap: 16, marginTop: 14, flexWrap: 'wrap' }}>
+    <div
+      style={{
+        display: 'flex',
+        gap: 'var(--fm-space-4)',
+        marginTop: 'var(--fm-space-3)',
+        flexWrap: 'wrap',
+      }}
+    >
       {items.map((k) => (
         <span
           key={k}
-          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--fm-space-1)' }}
           className="fm-secondary"
         >
           <span
@@ -382,7 +399,7 @@ function Legend() {
               background: KIND_COLOR[k],
             }}
           />
-          <span style={{ fontSize: 12 }}>{KIND_LABEL[k]}</span>
+          <span style={{ fontSize: 'var(--fm-font-caption)' }}>{KIND_LABEL[k]}</span>
         </span>
       ))}
     </div>

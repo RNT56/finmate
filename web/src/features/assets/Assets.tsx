@@ -132,30 +132,28 @@ export function Assets() {
             <div>
               <div
                 className="fm-secondary"
-                style={{ fontWeight: 600, fontSize: 14 }}
+                style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)' }}
               >
                 Portfolio value
               </div>
               <div
                 className="fm-hero-amount"
-                style={{ marginTop: 4 }}
+                style={{ marginTop: 'var(--fm-space-1)' }}
                 aria-live="polite"
               >
-                {loading ? '—' : fmt(totalValueMinor)}
+                {fmt(totalValueMinor)}
               </div>
               <div
                 className="fm-amount"
                 style={{
-                  marginTop: 6,
-                  fontSize: 16,
+                  marginTop: 'var(--fm-space-2)',
+                  fontSize: 'var(--fm-font-headline)',
                   color: gainPositive ? 'var(--fm-up)' : 'var(--fm-down)',
                 }}
               >
-                {loading
-                  ? ''
-                  : `${gainPositive ? '▲' : '▼'} ${fmt(Math.abs(totalGainMinor))} (${(
-                      totalGainPct * 100
-                    ).toFixed(1)}%)`}
+                {`${gainPositive ? '▲' : '▼'} ${fmt(Math.abs(totalGainMinor))} (${(
+                  totalGainPct * 100
+                ).toFixed(1)}%)`}
               </div>
             </div>
             <CurrencySwitcher
@@ -168,7 +166,11 @@ export function Assets() {
         <GlassCard>
           <div
             className="fm-secondary"
-            style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}
+            style={{
+              fontWeight: 600,
+              fontSize: 'var(--fm-font-subheadline)',
+              marginBottom: 'var(--fm-space-3)',
+            }}
           >
             Allocation by type
           </div>
@@ -178,7 +180,7 @@ export function Assets() {
             <div
               style={{
                 display: 'flex',
-                gap: 24,
+                gap: 'var(--fm-space-6)',
                 alignItems: 'center',
                 flexWrap: 'wrap',
               }}
@@ -199,8 +201,8 @@ export function Assets() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 10,
-                      padding: '6px 0',
+                      gap: 'var(--fm-space-2)',
+                      padding: 'var(--fm-space-1) 0',
                     }}
                   >
                     <span
@@ -214,7 +216,7 @@ export function Assets() {
                       }}
                     />
                     <span style={{ flex: 1 }}>{assetTypeLabel(s.type)}</span>
-                    <span className="fm-secondary" style={{ fontSize: 13 }}>
+                    <span className="fm-secondary" style={{ fontSize: 'var(--fm-font-footnote)' }}>
                       {(s.share * 100).toFixed(0)}%
                     </span>
                     <span className="fm-amount">{fmt(s.totalMinor)}</span>
@@ -231,19 +233,18 @@ export function Assets() {
             style={{
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: 8,
+              marginBottom: 'var(--fm-space-2)',
             }}
           >
             <span
               className="fm-secondary"
-              style={{ fontWeight: 600, fontSize: 14 }}
+              style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)' }}
             >
               Holdings
             </span>
             <button
               type="button"
-              className="fm-btn"
-              style={{ padding: '6px 12px', fontSize: 13 }}
+              className="fm-btn fm-btn-sm"
               onClick={() => setAssetModal({ existing: null })}
             >
               + Add asset
@@ -337,9 +338,9 @@ function AssetRow({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 14,
-        padding: '10px 0',
-        borderTop: '1px solid var(--fm-glass-border)',
+        gap: 'var(--fm-space-3)',
+        padding: 'var(--fm-space-2) 0',
+        borderTop: '1px solid var(--fm-hairline)',
         flexWrap: 'wrap',
       }}
     >
@@ -352,7 +353,7 @@ function AssetRow({
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ fontWeight: 600, display: 'block' }}>{asset.name}</span>
-        <span className="fm-secondary" style={{ fontSize: 13 }}>
+        <span className="fm-secondary" style={{ fontSize: 'var(--fm-font-footnote)' }}>
           {assetTypeLabel(asset.type)} · {asset.quantity} units
         </span>
       </span>
@@ -361,9 +362,9 @@ function AssetRow({
           {formatMoney(asset.valueMinor, asset.currency)}
         </span>
         <span
+          className="fm-amount"
           style={{
-            fontSize: 13,
-            fontWeight: 600,
+            fontSize: 'var(--fm-font-footnote)',
             color: positive ? 'var(--fm-up)' : 'var(--fm-down)',
           }}
         >
@@ -371,11 +372,10 @@ function AssetRow({
           {formatMoney(Math.abs(gain), asset.currency)} ({pct.toFixed(1)}%)
         </span>
       </span>
-      <span className="fm-row" style={{ gap: 6 }}>
+      <span className="fm-row" style={{ gap: 'var(--fm-space-1)' }}>
         <button
           type="button"
-          className="fm-btn fm-btn-ghost"
-          style={{ padding: '6px 10px', fontSize: 13 }}
+          className="fm-btn fm-btn-ghost fm-btn-sm"
           aria-label={`Record transaction for ${asset.name}`}
           onClick={onTransaction}
         >
@@ -383,8 +383,7 @@ function AssetRow({
         </button>
         <button
           type="button"
-          className="fm-btn fm-btn-ghost"
-          style={{ padding: '6px 10px', fontSize: 13 }}
+          className="fm-btn fm-btn-ghost fm-btn-sm"
           aria-label={`Edit ${asset.name}`}
           onClick={onEdit}
         >
@@ -392,8 +391,7 @@ function AssetRow({
         </button>
         <button
           type="button"
-          className="fm-btn fm-btn-ghost"
-          style={{ padding: '6px 10px', fontSize: 13 }}
+          className="fm-btn fm-btn-destructive fm-btn-sm"
           aria-label={`Delete ${asset.name}`}
           onClick={onDelete}
         >

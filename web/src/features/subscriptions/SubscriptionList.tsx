@@ -20,7 +20,7 @@ export function SubscriptionList() {
     <Page title="Subscriptions">
       <div
         className="fm-row"
-        style={{ justifyContent: 'space-between', marginBottom: 18 }}
+        style={{ justifyContent: 'space-between', marginBottom: 'var(--fm-space-5)' }}
       >
         <span className="fm-secondary">
           {loading
@@ -70,7 +70,10 @@ export function SubscriptionList() {
                     </span>
                     <div>
                       <div style={{ fontWeight: 650 }}>{sub.name}</div>
-                      <div className="fm-secondary" style={{ fontSize: 13 }}>
+                      <div
+                        className="fm-secondary"
+                        style={{ fontSize: 'var(--fm-font-footnote)' }}
+                      >
                         <span className="fm-badge">{sub.categoryName}</span>{' '}
                         {sub.billingPeriod} · {sub.usageState}
                       </div>
@@ -84,7 +87,7 @@ export function SubscriptionList() {
                         'de-DE'
                       )}
                     </div>
-                    <div className="fm-secondary" style={{ fontSize: 12 }}>
+                    <div className="fm-secondary" style={{ fontSize: 'var(--fm-font-caption)' }}>
                       / mo
                     </div>
                   </div>

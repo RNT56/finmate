@@ -525,7 +525,7 @@ export function Import() {
           <select
             id="import-type"
             className="fm-select"
-            style={{ marginBottom: 12 }}
+            style={{ marginBottom: 'var(--fm-space-3)' }}
             value={importType}
             onChange={(e) => onChangeType(e.target.value as ImportType)}
             aria-label="Import type"
@@ -537,7 +537,10 @@ export function Import() {
             ))}
           </select>
 
-          <div className="fm-secondary" style={{ fontSize: 14, marginBottom: 12 }}>
+          <div
+            className="fm-secondary"
+            style={{ fontSize: 'var(--fm-font-subheadline)', marginBottom: 'var(--fm-space-3)' }}
+          >
             Paste a {IMPORT_TYPES.find((t) => t.value === importType)?.label.toLowerCase()} CSV or
             choose a file. Header aliases ({spec.hint}) are detected automatically; map any columns
             that don't match, then preview before anything is saved.
@@ -555,7 +558,10 @@ export function Import() {
             placeholder={'name,amount,currency\nExample,12.99,EUR'}
           />
 
-          <div className="fm-row" style={{ gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+          <div
+            className="fm-row"
+            style={{ gap: 'var(--fm-space-2)', marginTop: 'var(--fm-space-3)', flexWrap: 'wrap' }}
+          >
             <button
               type="button"
               className="fm-btn"
@@ -579,13 +585,13 @@ export function Import() {
           </div>
 
           {fileError && (
-            <div className="fm-error" style={{ marginTop: 10 }} role="alert">
+            <div className="fm-error" style={{ marginTop: 'var(--fm-space-2)' }} role="alert">
               {fileError}
             </div>
           )}
           {imported !== null && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>
+            <div style={{ marginTop: 'var(--fm-space-3)' }}>
+              <div style={{ fontWeight: 600, marginBottom: 'var(--fm-space-2)' }}>
                 Imported {imported} {importedNoun}
                 {imported === 1 ? '' : 's'}.
               </div>
@@ -651,13 +657,16 @@ function MappingSection({
   const requiredLabel = required.map((f) => labels[f]).join(', ');
   return (
     <GlassCard>
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>Map columns</div>
-      <div className="fm-secondary" style={{ fontSize: 13, marginBottom: 12 }}>
+      <div style={{ fontWeight: 600, marginBottom: 'var(--fm-space-1)' }}>Map columns</div>
+      <div
+        className="fm-secondary"
+        style={{ fontSize: 'var(--fm-font-footnote)', marginBottom: 'var(--fm-space-3)' }}
+      >
         Detected {headers.length} column{headers.length === 1 ? '' : 's'}. Match each Finmate field
         to a column. {requiredLabel} {required.length === 1 ? 'is' : 'are'} required.
       </div>
 
-      <div className="fm-stack" style={{ gap: 8 }}>
+      <div className="fm-stack" style={{ gap: 'var(--fm-space-2)' }}>
         {fields.map((field) => {
           const isRequired = required.includes(field);
           const selectId = `map-${field}`;
@@ -665,12 +674,18 @@ function MappingSection({
             <div
               key={field}
               className="fm-row"
-              style={{ justifyContent: 'space-between', gap: 12, alignItems: 'center' }}
+              style={{ justifyContent: 'space-between', gap: 'var(--fm-space-3)', alignItems: 'center' }}
             >
               <label className="fm-field-label" htmlFor={selectId} style={{ margin: 0 }}>
                 {labels[field]}
                 {isRequired && (
-                  <span style={{ color: 'var(--fm-warning, #d97706)', marginLeft: 6, fontSize: 12 }}>
+                  <span
+                    style={{
+                      color: 'var(--fm-warning)',
+                      marginLeft: 'var(--fm-space-1)',
+                      fontSize: 'var(--fm-font-caption)',
+                    }}
+                  >
                     Required
                   </span>
                 )}
@@ -696,7 +711,11 @@ function MappingSection({
       </div>
 
       {!requiredFieldsMapped && (
-        <div className="fm-error" style={{ marginTop: 10, fontSize: 13 }} role="alert">
+        <div
+          className="fm-error"
+          style={{ marginTop: 'var(--fm-space-2)', fontSize: 'var(--fm-font-footnote)' }}
+          role="alert"
+        >
           Map {requiredLabel} to continue.
         </div>
       )}
@@ -704,7 +723,7 @@ function MappingSection({
       <button
         type="button"
         className="fm-btn"
-        style={{ marginTop: 12, width: '100%' }}
+        style={{ marginTop: 'var(--fm-space-3)', width: '100%' }}
         onClick={onPreview}
         disabled={!requiredFieldsMapped}
       >
@@ -737,7 +756,7 @@ function PreviewSection({
   return (
     <>
       <GlassCard>
-        <div className="fm-row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+        <div className="fm-row" style={{ justifyContent: 'space-between', marginBottom: 'var(--fm-space-3)' }}>
           <div style={{ fontWeight: 600 }}>
             Preview — {preview.rows.length} valid / {preview.errors.length} error
             {preview.errors.length === 1 ? '' : 's'} of {preview.totalRows} row
@@ -759,18 +778,23 @@ function PreviewSection({
             style={{
               justifyContent: 'space-between',
               alignItems: 'center',
-              gap: 12,
-              marginBottom: 12,
+              gap: 'var(--fm-space-3)',
+              marginBottom: 'var(--fm-space-3)',
               flexWrap: 'wrap',
             }}
           >
-            <div className="fm-secondary" style={{ fontSize: 13 }} role="status">
+            <div className="fm-secondary" style={{ fontSize: 'var(--fm-font-footnote)' }} role="status">
               {dupCount} possible duplicate{dupCount === 1 ? '' : 's'} detected (matching an existing{' '}
               {importedNoun} or another row). Importing all rows by default — the hint is advisory.
             </div>
             <label
               className="fm-row"
-              style={{ gap: 8, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}
+              style={{
+                gap: 'var(--fm-space-2)',
+                alignItems: 'center',
+                fontSize: 'var(--fm-font-footnote)',
+                cursor: 'pointer',
+              }}
             >
               <input
                 type="checkbox"
@@ -785,7 +809,9 @@ function PreviewSection({
 
         {preview.rows.length > 0 ? (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <table
+              style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fm-font-callout)' }}
+            >
               <thead>
                 <tr style={{ textAlign: 'left' }}>
                   <th style={cellHead}>Name</th>
@@ -802,7 +828,7 @@ function PreviewSection({
                     <tr
                       key={r.id}
                       style={{
-                        borderTop: '1px solid var(--fm-glass-border)',
+                        borderTop: '1px solid var(--fm-hairline)',
                         opacity: dimmed ? 0.45 : 1,
                       }}
                     >
@@ -827,7 +853,7 @@ function PreviewSection({
             </table>
           </div>
         ) : (
-          <div className="fm-secondary" style={{ fontSize: 14 }}>
+          <div className="fm-secondary" style={{ fontSize: 'var(--fm-font-callout)' }}>
             No valid {importedNoun} rows to import.
           </div>
         )}
@@ -835,7 +861,7 @@ function PreviewSection({
 
       {preview.errors.length > 0 && (
         <GlassCard>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Errors</div>
+          <div style={{ fontWeight: 600, marginBottom: 'var(--fm-space-2)' }}>Errors</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {preview.errors.map((e, i) => (
               <li key={`${e.row}-${e.field ?? 'file'}-${i}`} className="fm-error">
@@ -851,20 +877,20 @@ function PreviewSection({
 }
 
 const cellHead: React.CSSProperties = {
-  padding: '6px 8px',
+  padding: 'var(--fm-space-1) var(--fm-space-2)',
   fontWeight: 600,
   color: 'var(--fm-label-secondary)',
 };
-const cell: React.CSSProperties = { padding: '8px' };
+const cell: React.CSSProperties = { padding: 'var(--fm-space-2)' };
 const dupBadge: React.CSSProperties = {
   display: 'inline-block',
-  marginLeft: 8,
+  marginLeft: 'var(--fm-space-2)',
   padding: '1px 8px',
-  borderRadius: 999,
-  fontSize: 11,
+  borderRadius: 'var(--fm-radius-pill)',
+  fontSize: 'var(--fm-font-caption2)',
   fontWeight: 600,
-  color: 'var(--fm-warning, #d97706)',
-  border: '1px solid var(--fm-warning, #d97706)',
+  color: 'var(--fm-warning)',
+  border: '1px solid var(--fm-warning)',
   verticalAlign: 'middle',
   whiteSpace: 'nowrap',
 };

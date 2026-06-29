@@ -209,13 +209,13 @@ private struct FlowingSwatches: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: FinmateSpacing.sm)],
                   alignment: .leading, spacing: FinmateSpacing.sm) {
             ForEach(Array(swatches.enumerated()), id: \.offset) { _, swatch in
-                VStack(spacing: 4) {
+                VStack(spacing: FinmateSpacing.xs) {
                     RoundedRectangle(cornerRadius: FinmateRadius.sm, style: .continuous)
                         .fill(swatch.1)
                         .frame(height: 40)
                         .overlay(RoundedRectangle(cornerRadius: FinmateRadius.sm, style: .continuous)
                             .strokeBorder(FinmateColor.hairline))
-                    Text(swatch.0).font(.caption2).foregroundStyle(FinmateColor.labelSecondary)
+                    Text(swatch.0).font(FinmateType.caption2).foregroundStyle(FinmateColor.labelSecondary)
                 }
             }
         }

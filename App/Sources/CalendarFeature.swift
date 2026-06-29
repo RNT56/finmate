@@ -202,7 +202,7 @@ struct CalendarView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: FinmateTokens.spacing) {
+                VStack(spacing: FinmateSpacing.md) {
                     monthHeader
                     weekdayRow
                     monthGrid
@@ -227,7 +227,7 @@ struct CalendarView: View {
             .accessibilityLabel("Previous month")
             Spacer()
             Text(store.monthTitle)
-                .font(.system(.title3, design: .rounded).weight(.semibold))
+                .font(FinmateType.title3.weight(.semibold))
             Spacer()
             Button { store.step(months: 1) } label: {
                 Image(systemName: "chevron.right").font(.headline)
@@ -240,8 +240,8 @@ struct CalendarView: View {
         LazyVGrid(columns: columns, spacing: 6) {
             ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                 Text(symbol)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(FinmateType.caption2.weight(.semibold))
+                    .foregroundStyle(FinmateColor.labelSecondary)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -289,12 +289,12 @@ struct CalendarView: View {
     // MARK: Legend + toggle
 
     private var legend: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: FinmateSpacing.lg) {
             ForEach(CalendarEventKind.allCases, id: \.self) { kind in
-                HStack(spacing: 5) {
+                HStack(spacing: FinmateSpacing.xs + 1) {
                     Circle().fill(kind.dotColor).frame(width: 8, height: 8)
                         .accessibilityHidden(true)
-                    Text(kind.label).font(.caption2).foregroundStyle(.secondary)
+                    Text(kind.label).font(FinmateType.caption2).foregroundStyle(FinmateColor.labelSecondary)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(kind.label) legend")
@@ -308,10 +308,10 @@ struct CalendarView: View {
                 get: { store.remindersEnabled },
                 set: { newValue in Task { await store.setReminders(enabled: newValue) } }
             )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Payment reminders").font(.subheadline.weight(.medium))
+                VStack(alignment: .leading, spacing: FinmateSpacing.xs / 2) {
+                    Text("Payment reminders").font(FinmateType.subheadline.weight(.medium))
                     Text("Local notifications, 2 days ahead")
-                        .font(.caption2).foregroundStyle(.secondary)
+                        .font(FinmateType.caption2).foregroundStyle(FinmateColor.labelSecondary)
                 }
             }
         }
@@ -322,21 +322,21 @@ struct CalendarView: View {
     @ViewBuilder private var dayDetail: some View {
         if let day = store.selectedDay {
             let dayEvents = store.events(on: day)
-            VStack(alignment: .leading, spacing: FinmateTokens.spacing) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
                 Text(Self.detailTitle(day, calendar: store.calendar))
-                    .font(.headline)
+                    .font(FinmateType.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if dayEvents.isEmpty {
                     GlassCard {
-                        VStack(spacing: 8) {
+                        VStack(spacing: FinmateSpacing.sm) {
                             Image(systemName: "calendar.badge.checkmark")
                                 .font(.title)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(FinmateColor.labelSecondary)
                                 .accessibilityHidden(true)
                             Text("No events on this day")
-                                .font(.subheadline.weight(.medium))
+                                .font(FinmateType.subheadline.weight(.medium))
                             Text("No income, subscriptions, or bills are due.")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
                                 .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
@@ -346,19 +346,19 @@ struct CalendarView: View {
                 } else {
                     ForEach(dayEvents) { event in
                         GlassCard {
-                            HStack(spacing: 12) {
+                            HStack(spacing: FinmateSpacing.md) {
                                 Image(systemName: event.kind.symbol)
                                     .foregroundStyle(event.kind.dotColor)
                                     .font(.title3)
                                     .accessibilityHidden(true)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(event.title).font(.subheadline.weight(.medium))
-                                    Text(event.kind.label).font(.caption2).foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: FinmateSpacing.xs / 2) {
+                                    Text(event.title).font(FinmateType.subheadline.weight(.medium))
+                                    Text(event.kind.label).font(FinmateType.caption2).foregroundStyle(FinmateColor.labelSecondary)
                                 }
                                 Spacer()
                                 Text(event.money.formatted())
-                                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                                    .foregroundStyle(event.kind == .income ? FinmateColor.up : .primary)
+                                    .font(FinmateType.money(.subheadline))
+                                    .foregroundStyle(event.kind == .income ? FinmateColor.up : Color.primary)
                             }
                         }
                         .accessibilityElement(children: .combine)
@@ -394,10 +394,10 @@ private struct DayCell: View {
     }
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: FinmateSpacing.xs) {
             Text(dayNumber)
-                .font(.callout.weight(isSelected ? .bold : .regular))
-                .foregroundStyle(isSelected ? FinmateColor.bronze : .primary)
+                .font(FinmateType.callout.weight(isSelected ? .bold : .regular))
+                .foregroundStyle(isSelected ? FinmateColor.bronze : Color.primary)
             HStack(spacing: 3) {
                 ForEach(dotKinds, id: \.self) { kind in
                     Circle().fill(kind.dotColor).frame(width: 5, height: 5)
@@ -407,9 +407,9 @@ private struct DayCell: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 44)
-        .modifier(GlassBackground(cornerRadius: 12))
+        .modifier(GlassBackground(cornerRadius: FinmateRadius.sm))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: FinmateRadius.sm, style: .continuous)
                 .stroke(FinmateColor.bronze, lineWidth: isSelected ? 2 : 0)
         )
         .accessibilityElement(children: .combine)

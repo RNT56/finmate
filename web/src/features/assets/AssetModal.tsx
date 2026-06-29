@@ -70,20 +70,11 @@ export function AssetModal({ existing, onSave, onClose }: Props) {
       aria-modal="true"
       aria-label={existing ? 'Edit asset' : 'Add asset'}
       onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.35)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        zIndex: 100,
-      }}
+      className="fm-modal-overlay"
     >
-      <GlassCard className="fm-glass" style={{ width: 'min(440px, 100%)' }}>
+      <GlassCard className="fm-modal-sheet">
         <div onClick={(e) => e.stopPropagation()}>
-          <h2 style={{ marginTop: 0, fontSize: 20 }}>{existing ? 'Edit asset' : 'Add asset'}</h2>
+          <h2 className="fm-modal-title">{existing ? 'Edit asset' : 'Add asset'}</h2>
           <form className="fm-stack" onSubmit={submit}>
             <div>
               <label className="fm-field-label" htmlFor="asset-name">
@@ -98,7 +89,7 @@ export function AssetModal({ existing, onSave, onClose }: Props) {
               />
             </div>
 
-            <div className="fm-row" style={{ gap: 12 }}>
+            <div className="fm-row" style={{ gap: 'var(--fm-space-3)' }}>
               <div style={{ flex: 1 }}>
                 <label className="fm-field-label" htmlFor="asset-type">
                   Type
@@ -149,7 +140,7 @@ export function AssetModal({ existing, onSave, onClose }: Props) {
               />
             </div>
 
-            <div className="fm-row" style={{ gap: 12 }}>
+            <div className="fm-row" style={{ gap: 'var(--fm-space-3)' }}>
               <div style={{ flex: 1 }}>
                 <label className="fm-field-label" htmlFor="asset-cost">
                   Total cost basis
@@ -192,7 +183,7 @@ export function AssetModal({ existing, onSave, onClose }: Props) {
 
             {error && <div className="fm-error">{error}</div>}
 
-            <div className="fm-row" style={{ justifyContent: 'flex-end', marginTop: 4 }}>
+            <div className="fm-modal-actions">
               <button type="button" className="fm-btn fm-btn-ghost" onClick={onClose}>
                 Cancel
               </button>

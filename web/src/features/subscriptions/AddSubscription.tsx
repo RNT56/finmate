@@ -66,23 +66,11 @@ export function AddSubscription({ onSave, onClose }: Props) {
       aria-modal="true"
       aria-label="Add subscription"
       onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.35)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        zIndex: 100,
-      }}
+      className="fm-modal-overlay"
     >
-      <GlassCard
-        className="fm-glass"
-        style={{ width: 'min(440px, 100%)' }}
-      >
+      <GlassCard className="fm-modal-sheet">
         <div onClick={(e) => e.stopPropagation()}>
-          <h2 style={{ marginTop: 0, fontSize: 20 }}>Add subscription</h2>
+          <h2 className="fm-modal-title">Add subscription</h2>
           <form className="fm-stack" onSubmit={submit}>
             <div>
               <label className="fm-field-label" htmlFor="sub-name">
@@ -139,7 +127,7 @@ export function AddSubscription({ onSave, onClose }: Props) {
 
             {error && <div className="fm-error">{error}</div>}
 
-            <div className="fm-row" style={{ justifyContent: 'flex-end', marginTop: 4 }}>
+            <div className="fm-modal-actions">
               <button type="button" className="fm-btn fm-btn-ghost" onClick={onClose}>
                 Cancel
               </button>

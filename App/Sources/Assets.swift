@@ -220,7 +220,7 @@ struct AssetsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: FinmateTokens.spacing) {
+            VStack(spacing: FinmateSpacing.md) {
                 if store.isLoading && !store.hasLoaded {
                     SkeletonList(count: 4)
                 } else if let error = store.loadError {
@@ -233,7 +233,7 @@ struct AssetsView: View {
                     } actions: {
                         GlassButton("Add asset", systemImage: "plus") { addingAsset = true }
                     }
-                    .padding(.top, 24)
+                    .padding(.top, FinmateSpacing.xxl)
                 } else {
                     currencySwitcher
                     portfolioHeader
@@ -290,22 +290,24 @@ struct AssetsView: View {
 
     private var portfolioHeader: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.sm) {
                 Text("Portfolio value")
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(FinmateType.subheadline).foregroundStyle(FinmateColor.labelSecondary)
+                // Total stays neutral (semantic discipline — docs/06); only the gain
+                // delta below colours.
                 Text(store.portfolioValue.formatted())
-                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                    .font(FinmateType.money(.largeTitle, weight: .bold))
                     .contentTransition(.numericText())
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
-                HStack(spacing: 6) {
+                HStack(spacing: FinmateSpacing.xs + 2) {
                     Image(systemName: store.portfolioGainMinor >= 0 ? "arrow.up.right" : "arrow.down.right")
                     Text(store.portfolioGain.formatted())
                         .monospacedDigit()
                     Text("(\(gainPctText(store.portfolioGainPct)))")
                         .monospacedDigit()
                 }
-                .font(.headline)
+                .font(FinmateType.headline)
                 .foregroundStyle(AssetPalette.gainColor(store.portfolioGainMinor))
                 .accessibilityLabel("Total gain or loss \(store.portfolioGain.formatted()), \(gainPctText(store.portfolioGainPct))")
             }
@@ -316,9 +318,9 @@ struct AssetsView: View {
 
     private var distributionCard: some View {
         GlassCard {
-            VStack(spacing: 16) {
+            VStack(spacing: FinmateSpacing.lg) {
                 Text("Allocation by type")
-                    .font(.headline)
+                    .font(FinmateType.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 donut
                 legend
@@ -341,15 +343,15 @@ struct AssetsView: View {
         .chartLegend(.hidden)
         .frame(height: 220)
         .overlay {
-            VStack(spacing: 2) {
+            VStack(spacing: FinmateSpacing.xs / 2) {
                 Text(store.portfolioValue.formatted())
-                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .font(FinmateType.money(.title3, weight: .bold))
                     .contentTransition(.numericText())
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
-                Text("total").font(.caption).foregroundStyle(.secondary)
+                Text("total").font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
             }
-            .padding(.horizontal, 28)
+            .padding(.horizontal, FinmateSpacing.xl)
             .accessibilityHidden(true)
         }
         // Summary; the per-type breakdown is the legend below (tabular fallback).
@@ -359,18 +361,18 @@ struct AssetsView: View {
     /// Visible legend that doubles as the VoiceOver tabular fallback — one element
     /// per asset type ("Crypto, €25,000.00, 92 percent").
     private var legend: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: FinmateSpacing.sm) {
             ForEach(store.distribution, id: \.type) { slice in
-                HStack(spacing: 10) {
+                HStack(spacing: FinmateSpacing.md) {
                     Circle().fill(AssetPalette.color(for: slice.type)).frame(width: 10, height: 10)
                         .accessibilityHidden(true)
-                    Text(slice.type.displayName).font(.subheadline)
+                    Text(slice.type.displayName).font(FinmateType.subheadline)
                     Spacer()
                     Text(Money(minorUnits: slice.totalMinor, currency: store.displayCurrency).formatted())
-                        .font(.subheadline.monospacedDigit())
+                        .font(FinmateType.money(.subheadline, weight: .regular))
                     Text("\(Int((slice.share * 100).rounded()))%")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(FinmateType.money(.caption, weight: .regular))
+                        .foregroundStyle(FinmateColor.labelSecondary)
                         .frame(width: 40, alignment: .trailing)
                 }
                 .accessibilityElement(children: .ignore)
@@ -384,11 +386,8 @@ struct AssetsView: View {
     // MARK: Holdings list (glass rows with value + gain/loss)
 
     private var holdingsList: some View {
-        VStack(spacing: FinmateTokens.spacing) {
-            HStack {
-                Text("Holdings").font(.headline)
-                Spacer()
-            }
+        VStack(spacing: FinmateSpacing.md) {
+            SectionHeader("Holdings")
             ForEach(store.assets) { asset in
                 NavigationLink(value: asset) {
                     AssetRow(asset: asset,
@@ -423,21 +422,21 @@ struct AssetRow: View {
 
     var body: some View {
         GlassCard {
-            HStack(spacing: 14) {
+            HStack(spacing: FinmateSpacing.lg) {
                 Image(systemName: symbol)
                     .font(.title2).frame(width: 34)
                     .foregroundStyle(AssetPalette.color(for: asset.type))
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(asset.name).font(.headline)
-                    Text(asset.type.displayName).font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: FinmateSpacing.xs / 2) {
+                    Text(asset.name).font(FinmateType.headline)
+                    Text(asset.type.displayName).font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(displayValue.formatted())
-                        .font(.headline.monospacedDigit())
+                VStack(alignment: .trailing, spacing: FinmateSpacing.xs / 2) {
+                    // Holding value is a plain total → neutral; only the gain line colours.
+                    AmountText(displayValue.formatted(), style: .headline)
                     Text("\(displayGain.formatted())  \(String(format: "%+.1f%%", gainPct * 100))")
-                        .font(.caption2.monospacedDigit())
+                        .font(FinmateType.money(.caption2, weight: .regular))
                         .foregroundStyle(AssetPalette.gainColor(displayGain.minorUnits))
                 }
             }
@@ -480,27 +479,28 @@ struct AssetDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: FinmateTokens.spacing) {
+            VStack(spacing: FinmateSpacing.md) {
                 header
 
                 GlassCard {
                     VStack(spacing: 0) {
                         DetailRow(label: "Current value", value: asset.value.formatted())
-                        Divider().padding(.vertical, 8)
+                        Divider().padding(.vertical, FinmateSpacing.sm)
                         DetailRow(label: "Cost basis", value: asset.costBasis.formatted())
-                        Divider().padding(.vertical, 8)
+                        Divider().padding(.vertical, FinmateSpacing.sm)
                         DetailRow(label: "Per-unit price", value: asset.currentPrice.formatted())
-                        Divider().padding(.vertical, 8)
+                        Divider().padding(.vertical, FinmateSpacing.sm)
                         DetailRow(label: "Quantity", value: quantityText)
                     }
                 }
 
                 GlassCard {
                     HStack {
-                        Text("Unrealized gain/loss").foregroundStyle(.secondary)
+                        Text("Unrealized gain/loss")
+                            .font(FinmateType.body).foregroundStyle(FinmateColor.labelSecondary)
                         Spacer()
                         Text("\(Money(minorUnits: gainMinor, currency: asset.currency).formatted())  \(String(format: "%+.1f%%", AssetValuation.gainPct(asset) * 100))")
-                            .font(.body.monospacedDigit().weight(.semibold))
+                            .font(FinmateType.money(.body))
                             .foregroundStyle(AssetPalette.gainColor(gainMinor))
                     }
                     .accessibilityElement(children: .combine)
@@ -534,17 +534,17 @@ struct AssetDetailView: View {
 
     private var header: some View {
         GlassCard {
-            HStack(spacing: 16) {
+            HStack(spacing: FinmateSpacing.lg) {
                 Image(systemName: "chart.pie.fill")
                     .font(.system(size: headerIconSize))
                     .foregroundStyle(AssetPalette.color(for: asset.type))
                     .frame(width: headerIconSlot)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: FinmateSpacing.xs) {
                     Text(asset.name)
-                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .font(FinmateType.title2.weight(.bold))
                     Text(asset.type.displayName)
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(FinmateType.subheadline).foregroundStyle(FinmateColor.labelSecondary)
                 }
                 Spacer()
             }
@@ -553,15 +553,15 @@ struct AssetDetailView: View {
 
     private var transactionsCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Transactions").font(.headline)
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
+                Text("Transactions").font(FinmateType.headline)
                 if transactions.isEmpty {
                     Text("No transactions recorded.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(FinmateType.subheadline).foregroundStyle(FinmateColor.labelSecondary)
                 } else {
                     ForEach(transactions) { txn in
                         TransactionRow(transaction: txn, currency: asset.currency)
-                        if txn.id != transactions.last?.id { Divider().padding(.vertical, 4) }
+                        if txn.id != transactions.last?.id { Divider().padding(.vertical, FinmateSpacing.xs) }
                     }
                 }
             }
@@ -580,18 +580,18 @@ struct TransactionRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.kind.displayName).font(.subheadline.weight(.medium))
+            VStack(alignment: .leading, spacing: FinmateSpacing.xs / 2) {
+                Text(transaction.kind.displayName).font(FinmateType.subheadline.weight(.medium))
                 Text(transaction.date.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: FinmateSpacing.xs / 2) {
                 if transaction.priceMinor > 0 {
                     Text(Money(minorUnits: transaction.priceMinor, currency: currency).formatted())
-                        .font(.subheadline.monospacedDigit())
+                        .font(FinmateType.money(.subheadline, weight: .regular))
                 }
-                Text(detail).font(.caption2).foregroundStyle(.secondary)
+                Text(detail).font(FinmateType.caption2).foregroundStyle(FinmateColor.labelSecondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -683,7 +683,7 @@ struct AssetFormView: View {
                     TextField("Total cost basis", text: $costBasis).keyboardType(.decimalPad)
                     TextField("Current per-unit price", text: $currentPrice).keyboardType(.decimalPad)
                     if let error {
-                        Text(error).font(.caption).foregroundStyle(.red)
+                        Text(error).font(FinmateType.caption).foregroundStyle(FinmateColor.down)
                     }
                 }
             }
@@ -759,7 +759,7 @@ struct TransactionFormView: View {
                     TextField("Notes (optional)", text: $notes)
                 }
                 if let error {
-                    Text(error).font(.caption).foregroundStyle(.red)
+                    Text(error).font(FinmateType.caption).foregroundStyle(FinmateColor.down)
                 }
             }
             .navigationTitle("Record Transaction")

@@ -353,17 +353,17 @@ struct ExportDataView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: FinmateTokens.spacing) {
+            VStack(spacing: FinmateSpacing.md) {
                 GlassCard {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: FinmateSpacing.sm) {
                         Label(DataExport.fileName, systemImage: "doc.text")
-                            .font(.headline)
+                            .font(FinmateType.headline)
                         Text("A JSON copy of your subscriptions, income, expenses, assets, and preferences. Amounts are exported in raw minor units with their own currency.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(FinmateType.subheadline)
+                            .foregroundStyle(FinmateColor.labelSecondary)
                         Text(sizeLabel)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .font(FinmateType.caption)
+                            .foregroundStyle(FinmateColor.labelTertiary)
                     }
                 }
                 ShareLink(

@@ -84,7 +84,7 @@ export function CashFlow() {
         <GlassCard>
           <div
             className="fm-secondary"
-            style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}
+            style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)', marginBottom: 'var(--fm-space-3)' }}
           >
             Money flow
           </div>
@@ -106,22 +106,16 @@ export function CashFlow() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           }}
         >
-          <Kpi
-            label="Monthly income"
-            value={loading ? '—' : fmt(metrics.incomeMinor)}
-          />
-          <Kpi
-            label="Monthly expenses"
-            value={loading ? '—' : fmt(metrics.expenseMinor)}
-          />
+          <Kpi label="Monthly income" value={fmt(metrics.incomeMinor)} />
+          <Kpi label="Monthly expenses" value={fmt(metrics.expenseMinor)} />
           <Kpi
             label="Net"
-            value={loading ? '—' : fmt(metrics.netMinor)}
+            value={fmt(metrics.netMinor)}
             tone={netPositive ? 'positive' : 'negative'}
           />
           <Kpi
             label="Savings rate"
-            value={loading ? '—' : `${savingsPct}%`}
+            value={`${savingsPct}%`}
             tone={netPositive ? 'positive' : 'negative'}
           />
         </div>
@@ -129,7 +123,7 @@ export function CashFlow() {
         <GlassCard>
           <div
             className="fm-secondary"
-            style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}
+            style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)', marginBottom: 'var(--fm-space-3)' }}
           >
             Income vs. expenses
           </div>
@@ -143,7 +137,7 @@ export function CashFlow() {
         <GlassCard>
           <div
             className="fm-secondary"
-            style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}
+            style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)', marginBottom: 'var(--fm-space-2)' }}
           >
             Expense breakdown
           </div>
@@ -160,15 +154,15 @@ export function CashFlow() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '8px 0',
-                    borderTop: '1px solid var(--fm-glass-border)',
+                    padding: 'var(--fm-space-2) 0',
+                    borderTop: '1px solid var(--fm-hairline)',
                   }}
                 >
                   <span>{row.label}</span>
                   <span
-                    style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}
+                    style={{ display: 'flex', gap: 'var(--fm-space-3)', alignItems: 'baseline' }}
                   >
-                    <span className="fm-secondary" style={{ fontSize: 13 }}>
+                    <span className="fm-secondary" style={{ fontSize: 'var(--fm-font-footnote)' }}>
                       {(share * 100).toFixed(0)}%
                     </span>
                     <span className="fm-amount">{fmt(row.amountMinor)}</span>
@@ -184,7 +178,7 @@ export function CashFlow() {
           </ul>
           <div
             className="fm-secondary"
-            style={{ fontSize: 12, marginTop: 8 }}
+            style={{ fontSize: 'var(--fm-font-caption)', marginTop: 'var(--fm-space-2)' }}
             aria-hidden="true"
           >
             Fixed {fmt(fixedMinor)} · Subscriptions {fmt(subscriptionsMinor)} ·
@@ -286,21 +280,16 @@ function EntitySection({
         style={{
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 8,
+          marginBottom: 'var(--fm-space-2)',
         }}
       >
         <span
           className="fm-secondary"
-          style={{ fontWeight: 600, fontSize: 14 }}
+          style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)' }}
         >
           {title}
         </span>
-        <button
-          type="button"
-          className="fm-btn"
-          style={{ padding: '6px 12px', fontSize: 13 }}
-          onClick={onAdd}
-        >
+        <button type="button" className="fm-btn fm-btn-sm" onClick={onAdd}>
           {addLabel}
         </button>
       </div>
@@ -312,25 +301,24 @@ function EntitySection({
             style={{
               justifyContent: 'space-between',
               alignItems: 'center',
-              gap: 12,
-              padding: '10px 0',
-              borderTop: '1px solid var(--fm-glass-border)',
+              gap: 'var(--fm-space-3)',
+              padding: 'var(--fm-space-2) 0',
+              borderTop: '1px solid var(--fm-hairline)',
             }}
           >
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ fontWeight: 600, display: 'block' }}>
                 {row.primary}
               </span>
-              <span className="fm-secondary" style={{ fontSize: 13 }}>
+              <span className="fm-secondary" style={{ fontSize: 'var(--fm-font-footnote)' }}>
                 {row.secondary}
               </span>
             </span>
             <span className="fm-amount">{row.amount}</span>
-            <span className="fm-row" style={{ gap: 6 }}>
+            <span className="fm-row" style={{ gap: 'var(--fm-space-1)' }}>
               <button
                 type="button"
-                className="fm-btn fm-btn-ghost"
-                style={{ padding: '6px 10px', fontSize: 13 }}
+                className="fm-btn fm-btn-ghost fm-btn-sm"
                 aria-label={`Edit ${row.primary}`}
                 onClick={() => onEdit(row.entity)}
               >
@@ -338,8 +326,7 @@ function EntitySection({
               </button>
               <button
                 type="button"
-                className="fm-btn fm-btn-ghost"
-                style={{ padding: '6px 10px', fontSize: 13 }}
+                className="fm-btn fm-btn-destructive fm-btn-sm"
                 aria-label={`Delete ${row.primary}`}
                 onClick={() => void onDelete(row.id)}
               >
@@ -369,18 +356,21 @@ function Kpi({
 }) {
   const color =
     tone === 'positive'
-      ? 'var(--fm-positive, #1f9d55)'
+      ? 'var(--fm-positive)'
       : tone === 'negative'
-        ? 'var(--fm-negative, #d23f3f)'
+        ? 'var(--fm-negative)'
         : 'inherit';
   return (
     <GlassCard>
-      <div className="fm-secondary" style={{ fontWeight: 600, fontSize: 14 }}>
+      <div
+        className="fm-secondary"
+        style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)' }}
+      >
         {label}
       </div>
       <div
         className="fm-amount"
-        style={{ fontSize: '1.625rem', marginTop: 6, color }}
+        style={{ fontSize: 'var(--fm-font-title2)', marginTop: 'var(--fm-space-2)', color }}
         aria-live="polite"
       >
         {value}
@@ -449,7 +439,7 @@ function IncomeExpenseBar({
           width={incomeW}
           height={barH}
           rx={8}
-          fill="var(--fm-positive, #1f9d55)"
+          fill="var(--fm-positive)"
         />
         <text
           x={labelW + trackW + 8}
@@ -482,7 +472,7 @@ function IncomeExpenseBar({
           width={expenseW}
           height={barH}
           rx={8}
-          fill="var(--fm-negative, #d23f3f)"
+          fill="var(--fm-negative)"
         />
         <text
           x={labelW + trackW + 8}

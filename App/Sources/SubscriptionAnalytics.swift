@@ -52,7 +52,7 @@ struct SubscriptionAnalyticsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: FinmateTokens.spacing) {
+            VStack(spacing: FinmateSpacing.md) {
                 if slices.isEmpty {
                     ContentUnavailableView(
                         "No subscriptions yet",
@@ -61,9 +61,9 @@ struct SubscriptionAnalyticsView: View {
                         .padding(.top, 40)
                 } else {
                     GlassCard {
-                        VStack(spacing: 16) {
+                        VStack(spacing: FinmateSpacing.lg) {
                             Text("Monthly spend by category")
-                                .font(.headline)
+                                .font(FinmateType.headline)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             donut
                             legend
@@ -93,11 +93,11 @@ struct SubscriptionAnalyticsView: View {
         .chartLegend(.hidden)
         .frame(height: 220)
         .overlay {
-            VStack(spacing: 2) {
+            VStack(spacing: FinmateSpacing.xs / 2) {
                 Text(totalMonthly.formatted())
-                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .font(FinmateType.money(.title3, weight: .bold))
                     .contentTransition(.numericText())
-                Text("per month").font(.caption).foregroundStyle(.secondary)
+                Text("per month").font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
             }
             .accessibilityHidden(true)
         }
@@ -109,18 +109,18 @@ struct SubscriptionAnalyticsView: View {
     /// Visible legend that doubles as the VoiceOver tabular fallback — one element
     /// per category, read as "Entertainment, €23.98 per month, 65 percent".
     private var legend: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: FinmateSpacing.sm) {
             ForEach(Array(slices.enumerated()), id: \.element.id) { index, slice in
-                HStack(spacing: 10) {
+                HStack(spacing: FinmateSpacing.md) {
                     Circle().fill(color(for: index)).frame(width: 10, height: 10)
                         .accessibilityHidden(true)
-                    Text(slice.category).font(.subheadline)
+                    Text(slice.category).font(FinmateType.subheadline)
                     Spacer()
                     Text(Money(minorUnits: slice.monthlyMinor, currency: displayCurrency).formatted())
-                        .font(.subheadline.monospacedDigit())
+                        .font(FinmateType.money(.subheadline, weight: .regular))
                     Text("\(Int((slice.share * 100).rounded()))%")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(FinmateType.money(.caption, weight: .regular))
+                        .foregroundStyle(FinmateColor.labelSecondary)
                         .frame(width: 40, alignment: .trailing)
                 }
                 .accessibilityElement(children: .ignore)

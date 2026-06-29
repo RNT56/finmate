@@ -219,21 +219,20 @@ struct SubscriptionRow: View {
     let subscription: Subscription
     var body: some View {
         GlassCard {
-            HStack(spacing: 14) {
+            HStack(spacing: FinmateSpacing.lg) {
                 Image(systemName: subscription.icon ?? "creditcard.fill")
                     .font(.title2).frame(minWidth: 34)
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(FinmateColor.bronze)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(subscription.name).font(.headline)
+                VStack(alignment: .leading, spacing: FinmateSpacing.xs) {
+                    Text(subscription.name).font(FinmateType.headline)
                     Text("\(subscription.billingPeriod.rawValue.capitalized) · \(subscription.usageState.rawValue.capitalized)")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(subscription.monthlyAmount.formatted())
-                        .font(.headline.monospacedDigit())
-                    Text("/mo").font(.caption2).foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: FinmateSpacing.xs) {
+                    AmountText(subscription.monthlyAmount.formatted(), style: .headline)
+                    Text("/mo").font(FinmateType.caption2).foregroundStyle(FinmateColor.labelSecondary)
                 }
             }
         }
@@ -268,7 +267,7 @@ struct AddSubscriptionView: View {
                         .keyboardType(.decimalPad)
                         .accessibilityIdentifier("addSubscription.amount")
                     if let amountError {
-                        Text(amountError).font(.caption).foregroundStyle(.red)
+                        Text(amountError).font(FinmateType.caption).foregroundStyle(FinmateColor.down)
                     }
                 }
             }

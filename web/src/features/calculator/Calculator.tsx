@@ -30,7 +30,14 @@ export function Calculator() {
     <Page title="BTC Calculator">
       <div className="fm-stack">
         <GlassCard>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 'var(--fm-space-3)',
+              alignItems: 'flex-end',
+              flexWrap: 'wrap',
+            }}
+          >
             <div style={{ flex: 1, minWidth: 160 }}>
               <label className="fm-field-label" htmlFor="calc-amount">
                 Amount
@@ -65,22 +72,35 @@ export function Calculator() {
         </GlassCard>
 
         <GlassCard>
-          <div className="fm-secondary" style={{ fontWeight: 600, fontSize: 14 }}>
+          <div
+            className="fm-secondary"
+            style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)' }}
+          >
             Converts to
           </div>
           {result === null ? (
-            <div className="fm-error" style={{ marginTop: 8 }}>
+            <div className="fm-error" style={{ marginTop: 'var(--fm-space-2)' }}>
               Enter a valid amount.
             </div>
           ) : (
             <>
-              <div className="fm-hero-amount" style={{ marginTop: 6 }} aria-live="polite">
+              <div
+                className="fm-hero-amount"
+                style={{ marginTop: 'var(--fm-space-2)' }}
+                aria-live="polite"
+              >
                 {result.btc.toLocaleString('en-US', { maximumFractionDigits: 8 })} BTC
               </div>
-              <div className="fm-amount" style={{ marginTop: 4, fontSize: 18 }}>
+              <div
+                className="fm-amount"
+                style={{ marginTop: 'var(--fm-space-1)', fontSize: 'var(--fm-font-title3)' }}
+              >
                 {formatMoney(result.sats, 'BTC')}
               </div>
-              <div className="fm-secondary" style={{ marginTop: 8, fontSize: 13 }}>
+              <div
+                className="fm-secondary"
+                style={{ marginTop: 'var(--fm-space-2)', fontSize: 'var(--fm-font-footnote)' }}
+              >
                 {formatMoney(result.fiatMinor, fiat)} at{' '}
                 {fiat === 'EUR'
                   ? `€${btcEur.toLocaleString('en-US')}`
@@ -92,7 +112,14 @@ export function Calculator() {
         </GlassCard>
 
         <GlassCard>
-          <div className="fm-secondary" style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+          <div
+            className="fm-secondary"
+            style={{
+              fontWeight: 600,
+              fontSize: 'var(--fm-font-subheadline)',
+              marginBottom: 'var(--fm-space-2)',
+            }}
+          >
             Sample rates
           </div>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }} aria-label="Sample exchange rates">
@@ -103,7 +130,10 @@ export function Calculator() {
               value={APP_RATES.eurUsd.toFixed(2)}
             />
           </ul>
-          <div className="fm-secondary" style={{ fontSize: 12, marginTop: 8 }}>
+          <div
+            className="fm-secondary"
+            style={{ fontSize: 'var(--fm-font-caption)', marginTop: 'var(--fm-space-2)' }}
+          >
             Rates are illustrative. Live rates come from the server-side market-data
             function (ADR-0010), never the client.
           </div>
@@ -119,8 +149,8 @@ function RateRow({ label, value }: { label: string; value: string }) {
       style={{
         display: 'flex',
         justifyContent: 'space-between',
-        padding: '8px 0',
-        borderTop: '1px solid var(--fm-glass-border)',
+        padding: 'var(--fm-space-2) 0',
+        borderTop: '1px solid var(--fm-hairline)',
       }}
     >
       <span className="fm-secondary">{label}</span>

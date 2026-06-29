@@ -73,15 +73,15 @@ struct AuthView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: FinmateTokens.spacing) {
+            VStack(spacing: FinmateSpacing.md) {
                 header
 
                 GlassCard {
-                    VStack(spacing: 16) {
+                    VStack(spacing: FinmateSpacing.lg) {
                         Picker("Mode", selection: $mode) {
                             ForEach(AuthMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                         }
-                        .pickerStyle(.segmented)
+                        .finmateSegmented()
                         .accessibilityLabel("Sign in or sign up")
 
                         emailPasswordFields
@@ -93,15 +93,15 @@ struct AuthView: View {
 
                         if let error = store.errorMessage {
                             Text(error)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
+                                .font(FinmateType.footnote)
+                                .foregroundStyle(FinmateColor.down)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .accessibilityLabel("Error: \(error)")
                         }
                         if let info = store.infoMessage {
                             Text(info)
-                                .font(.footnote)
-                                .foregroundStyle(.green)
+                                .font(FinmateType.footnote)
+                                .foregroundStyle(FinmateColor.up)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .accessibilityLabel(info)
                         }
@@ -126,23 +126,23 @@ struct AuthView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: FinmateSpacing.sm) {
             Image(systemName: "creditcard.circle.fill")
                 .font(.system(size: heroIconSize))
-                .foregroundStyle(.tint)
+                .foregroundStyle(FinmateColor.bronze)
                 .accessibilityHidden(true)
             Text("Finmate")
-                .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                .font(FinmateType.largeTitle.weight(.bold))
             Text("Private-first personal finance.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(FinmateType.subheadline)
+                .foregroundStyle(FinmateColor.labelSecondary)
         }
-        .padding(.vertical, 24)
+        .padding(.vertical, FinmateSpacing.xxl)
         .accessibilityElement(children: .combine)
     }
 
     private var emailPasswordFields: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: FinmateSpacing.md) {
             TextField("Email", text: $email)
                 .textContentType(.emailAddress)
                 .keyboardType(.emailAddress)
@@ -156,8 +156,8 @@ struct AuthView: View {
                 .accessibilityLabel("Password")
             if !password.isEmpty && !passwordIsValid {
                 Text("Password must be at least 8 characters.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(FinmateType.caption)
+                    .foregroundStyle(FinmateColor.labelSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -185,7 +185,7 @@ struct AuthView: View {
     @ViewBuilder
     private var forgotPasswordSection: some View {
         if showingReset {
-            VStack(spacing: 10) {
+            VStack(spacing: FinmateSpacing.md) {
                 TextField("Email for reset link", text: $resetEmail)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
@@ -209,7 +209,7 @@ struct AuthView: View {
                 resetEmail = email
                 withAnimation(reduceMotion ? nil : .default) { showingReset = true }
             }
-            .font(.footnote)
+            .font(FinmateType.footnote)
             .frame(maxWidth: .infinity, alignment: .trailing)
             .accessibilityIdentifier("auth.forgotPassword")
         }
@@ -218,7 +218,7 @@ struct AuthView: View {
     private var dividerOr: some View {
         HStack {
             VStack { Divider() }
-            Text("or").font(.caption).foregroundStyle(.secondary)
+            Text("or").font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
             VStack { Divider() }
         }
     }
@@ -308,39 +308,39 @@ struct OnboardingView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: FinmateTokens.spacing) {
-                VStack(spacing: 8) {
+            VStack(spacing: FinmateSpacing.md) {
+                VStack(spacing: FinmateSpacing.sm) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: heroIconSize)).foregroundStyle(.tint)
+                        .font(.system(size: heroIconSize)).foregroundStyle(FinmateColor.bronze)
                         .accessibilityHidden(true)
                     Text("Welcome to Finmate")
-                        .font(.system(.title, design: .rounded).weight(.bold))
+                        .font(FinmateType.title.weight(.bold))
                     Text("A couple of quick choices to get started.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(FinmateType.subheadline).foregroundStyle(FinmateColor.labelSecondary)
                 }
-                .padding(.vertical, 16)
+                .padding(.vertical, FinmateSpacing.lg)
                 .accessibilityElement(children: .combine)
 
                 GlassCard {
-                    VStack(alignment: .leading, spacing: 18) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Display currency").font(.headline)
+                    VStack(alignment: .leading, spacing: FinmateSpacing.xl) {
+                        VStack(alignment: .leading, spacing: FinmateSpacing.sm) {
+                            Text("Display currency").font(FinmateType.headline)
                             Picker("Display currency", selection: $currency) {
                                 ForEach([CurrencyCode.eur, .usd, .btc], id: \.self) {
                                     Text($0.displayLabel).tag($0)
                                 }
                             }
-                            .pickerStyle(.segmented)
+                            .finmateSegmented()
                             .accessibilityLabel("Default display currency")
                         }
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Appearance").font(.headline)
+                        VStack(alignment: .leading, spacing: FinmateSpacing.sm) {
+                            Text("Appearance").font(FinmateType.headline)
                             Picker("Appearance", selection: $appearance) {
                                 ForEach(Appearance.allCases, id: \.self) {
                                     Text($0.label).tag($0)
                                 }
                             }
-                            .pickerStyle(.segmented)
+                            .finmateSegmented()
                             .accessibilityLabel("Appearance theme")
                         }
                         Toggle(isOn: $biometric) {
