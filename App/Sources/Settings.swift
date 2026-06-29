@@ -208,11 +208,13 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(exporting)
+                .accessibilityHint("Creates a JSON copy of your data to share")
                 Button(role: .destructive) {
                     showingDeleteConfirm = true
                 } label: {
                     Label("Delete account", systemImage: "trash")
                 }
+                .accessibilityHint("Permanently deletes your account and all data")
             } header: {
                 Text("Data")
             } footer: {

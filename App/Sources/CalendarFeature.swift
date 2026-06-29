@@ -261,6 +261,8 @@ struct CalendarView: View {
                     .onTapGesture {
                         withAnimation(reduceMotion ? nil : .snappy) { store.selectedDay = day }
                     }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint("Shows events for this day")
                 } else {
                     Color.clear.frame(height: 44)
                 }
@@ -290,8 +292,11 @@ struct CalendarView: View {
             ForEach(CalendarEventKind.allCases, id: \.self) { kind in
                 HStack(spacing: 5) {
                     Circle().fill(kind.dotColor).frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
                     Text(kind.label).font(.caption2).foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(kind.label) legend")
             }
         }
     }
@@ -344,6 +349,7 @@ struct CalendarView: View {
                                 Image(systemName: event.kind.symbol)
                                     .foregroundStyle(event.kind.dotColor)
                                     .font(.title3)
+                                    .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(event.title).font(.subheadline.weight(.medium))
                                     Text(event.kind.label).font(.caption2).foregroundStyle(.secondary)
@@ -354,6 +360,8 @@ struct CalendarView: View {
                                     .foregroundStyle(event.kind == .income ? .green : .primary)
                             }
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(event.kind.label), \(event.title), \(event.money.formatted())")
                     }
                 }
             }

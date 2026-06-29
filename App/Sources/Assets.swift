@@ -396,6 +396,7 @@ struct AssetsView: View {
                              gainPct: AssetValuation.gainPct(asset))
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint("Opens holding details. Long press for edit and delete")
                 .contextMenu {
                     Button { editingAsset = asset } label: { Label("Edit", systemImage: "pencil") }
                     Button(role: .destructive) {
@@ -425,6 +426,7 @@ struct AssetRow: View {
                 Image(systemName: symbol)
                     .font(.title2).frame(width: 34)
                     .foregroundStyle(AssetPalette.color(for: asset.type))
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(asset.name).font(.headline)
                     Text(asset.type.displayName).font(.caption).foregroundStyle(.secondary)
@@ -439,6 +441,7 @@ struct AssetRow: View {
                 }
             }
             .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(asset.name), \(asset.type.displayName), value \(displayValue.formatted()), gain \(displayGain.formatted())")
         }
     }
 

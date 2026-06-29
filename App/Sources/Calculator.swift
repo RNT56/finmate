@@ -7,7 +7,8 @@ import Domain
 // display-only; market data comes from the Edge Function in production (ADR-0010).
 
 struct CalculatorView: View {
-    private let converter = CurrencyConverter(rates: AssetsSampleData.sampleRates)
+    private let model = CryptoCalculatorModel(
+        converter: CurrencyConverter(rates: AssetsSampleData.sampleRates))
 
     @State private var amount: String = "500"
     @State private var fiatCurrency: CurrencyCode = .eur
@@ -17,16 +18,12 @@ struct CalculatorView: View {
     private let fiatOptions: [CurrencyCode] = [.eur, .usd]
 
     private var conversion: CryptoConversion? {
-        let raw = amount.trimmingCharacters(in: .whitespaces)
-        guard !raw.isEmpty else { return nil }
-        guard let fiat = try? Money.parse(raw, currency: fiatCurrency) else { return nil }
-        return try? CryptoCalculator.fiatToBTC(fiat, converter: converter)
+        model.conversion(for: amount, currency: fiatCurrency)
     }
 
     private var rateText: String {
-        let rate = fiatCurrency == .eur ? AssetsSampleData.sampleRates.btcEur : AssetsSampleData.sampleRates.btcUsd
-        let money = Money(minorUnits: NSDecimalNumber(decimal: rate * Decimal(fiatCurrency.minorUnitsPerMajor)).int64Value,
-                          currency: fiatCurrency)
+        let money = model.rateMoney(for: fiatCurrency)
+            ?? Money.zero(fiatCurrency)
         return "1 ₿ = \(money.formatted())"
     }
 
@@ -60,6 +57,8 @@ struct CalculatorView: View {
                     TextField("0", text: $amount)
                         .keyboardType(.decimalPad)
                         .font(.system(.title2, design: .rounded).weight(.semibold))
+                        .accessibilityLabel("Fiat amount")
+                        .accessibilityHint("Amount to convert to bitcoin")
                         .onChange(of: amount) { _, newValue in
                             validate(newValue)
                         }
@@ -69,6 +68,7 @@ struct CalculatorView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .accessibilityLabel("Source currency")
                     .onChange(of: fiatCurrency) { _, _ in validate(amount) }
                 }
                 if let parseError {
@@ -85,12 +85,15 @@ struct CalculatorView: View {
                 if let conversion {
                     HStack {
                         Image(systemName: "bitcoinsign.circle.fill").foregroundStyle(.orange)
+                            .accessibilityHidden(true)
                         Text(conversion.btc.formatted())
                             .font(.system(.title, design: .rounded).weight(.bold))
                             .contentTransition(.numericText())
                             .minimumScaleFactor(0.6)
                             .lineLimit(1)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Equivalent \(conversion.btc.formatted())")
                     Divider()
                     HStack {
                         Text("Satoshis").foregroundStyle(.secondary)

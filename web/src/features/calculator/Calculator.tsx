@@ -6,12 +6,9 @@
 import { useMemo, useState } from 'react';
 import { GlassCard } from '../../components/GlassCard';
 import { Page } from '../../components/AppShell';
-import {
-  CurrencyConverter,
-  type CurrencyCode,
-  btcFromSats,
-} from '../../core/currency';
-import { formatMoney, parseMoney } from '../../core/money';
+import { CurrencyConverter, type CurrencyCode } from '../../core/currency';
+import { formatMoney } from '../../core/money';
+import { computeBtcConversion } from '../../core/calculator';
 import { APP_RATES } from '../../lib/rates';
 
 const FIAT: CurrencyCode[] = ['EUR', 'USD'];
@@ -21,21 +18,10 @@ export function Calculator() {
   const [fiat, setFiat] = useState<CurrencyCode>('EUR');
   const converter = useMemo(() => new CurrencyConverter(APP_RATES), []);
 
-  const result = useMemo(() => {
-    let minor: number;
-    try {
-      minor = parseMoney(amount, fiat);
-    } catch {
-      return null;
-    }
-    const sats = converter.convert(minor, fiat, 'BTC');
-    if (!sats.ok) return null;
-    return {
-      fiatMinor: minor,
-      sats: sats.minorUnits,
-      btc: btcFromSats(sats.minorUnits),
-    };
-  }, [amount, fiat, converter]);
+  const result = useMemo(
+    () => computeBtcConversion(amount, fiat, converter),
+    [amount, fiat, converter],
+  );
 
   const btcEur = APP_RATES.btcEur;
   const btcUsd = APP_RATES.btcUsd;
@@ -109,7 +95,7 @@ export function Calculator() {
           <div className="fm-secondary" style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
             Sample rates
           </div>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }} aria-label="Sample exchange rates">
             <RateRow label="BTC / EUR" value={`€${btcEur.toLocaleString('en-US')}`} />
             <RateRow label="BTC / USD" value={`$${btcUsd.toLocaleString('en-US')}`} />
             <RateRow

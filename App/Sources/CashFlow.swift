@@ -415,6 +415,7 @@ struct CashFlowView: View {
                 ForEach(Array(store.expenseSlices.enumerated()), id: \.element.category) { index, slice in
                     HStack(spacing: 10) {
                         Circle().fill(color(for: index)).frame(width: 10, height: 10)
+                            .accessibilityHidden(true)
                         Text(slice.category).font(.subheadline)
                         Spacer()
                         Text(Money(minorUnits: slice.totalMinor, currency: store.displayCurrency).formatted())
@@ -425,6 +426,7 @@ struct CashFlowView: View {
                             .frame(width: 40, alignment: .trailing)
                     }
                     .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(slice.category), \(Money(minorUnits: slice.totalMinor, currency: store.displayCurrency).formatted()), \(Int((slice.share * 100).rounded())) percent")
                 }
             }
         }
@@ -519,6 +521,7 @@ struct CashFlowView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: symbol).foregroundStyle(tint)
+                        .accessibilityHidden(true)
                     Text(title).font(.headline)
                     Spacer()
                     Button(action: add) { Image(systemName: "plus.circle.fill") }
@@ -552,9 +555,14 @@ struct CashFlowView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture(perform: edit)
+        // Combine the row into a single element; expose edit (tap) + delete as
+        // VoiceOver actions so neither control is lost to the combine.
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(name), \(detail), \(amount)")
-        .accessibilityHint("Tap to edit")
+        .accessibilityHint("Double tap to edit")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Edit", edit)
+        .accessibilityAction(named: "Delete", delete)
     }
 }
 
@@ -570,6 +578,7 @@ struct KPICard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Image(systemName: symbol).foregroundStyle(tint)
+                        .accessibilityHidden(true)
                     Text(title).font(.caption).foregroundStyle(.secondary)
                 }
                 Text(value)
@@ -580,6 +589,8 @@ struct KPICard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), \(value)")
     }
 }
 

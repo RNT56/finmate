@@ -410,5 +410,12 @@ struct DashboardCardView: View {
             }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        var parts = ["\(value.title), \(value.value)"]
+        if let detail = value.detail { parts.append(detail) }
+        return parts.joined(separator: ", ")
     }
 }
