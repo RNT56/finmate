@@ -380,7 +380,7 @@ function Kpi({
       </div>
       <div
         className="fm-amount"
-        style={{ fontSize: 26, marginTop: 6, color }}
+        style={{ fontSize: '1.625rem', marginTop: 6, color }}
         aria-live="polite"
       >
         {value}

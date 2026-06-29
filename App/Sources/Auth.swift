@@ -50,6 +50,11 @@ struct AuthView: View {
     /// The address typed into the reset field (kept separate from sign-in email).
     @State private var resetEmail = ""
 
+    /// Reduce-motion gate for the inline reset-field reveal.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Hero icon size — scales with Dynamic Type so it grows alongside the title.
+    @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 56
+
     /// Minimal client-side validation: a plausible email + a >= 8-char password.
     private var emailIsValid: Bool {
         Self.isPlausibleEmail(email)
@@ -123,8 +128,9 @@ struct AuthView: View {
     private var header: some View {
         VStack(spacing: 8) {
             Image(systemName: "creditcard.circle.fill")
-                .font(.system(size: 56))
+                .font(.system(size: heroIconSize))
                 .foregroundStyle(.tint)
+                .accessibilityHidden(true)
             Text("Finmate")
                 .font(.system(.largeTitle, design: .rounded).weight(.bold))
             Text("Private-first personal finance.")
@@ -201,7 +207,7 @@ struct AuthView: View {
         } else {
             Button("Forgot password?") {
                 resetEmail = email
-                withAnimation { showingReset = true }
+                withAnimation(reduceMotion ? nil : .default) { showingReset = true }
             }
             .font(.footnote)
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -297,12 +303,16 @@ struct OnboardingView: View {
     @State private var appearance: Appearance = .system
     @State private var biometric = false
 
+    /// Hero icon size — scales with Dynamic Type alongside the welcome title.
+    @ScaledMetric(relativeTo: .title) private var heroIconSize: CGFloat = 48
+
     var body: some View {
         ScrollView {
             VStack(spacing: FinmateTokens.spacing) {
                 VStack(spacing: 8) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 48)).foregroundStyle(.tint)
+                        .font(.system(size: heroIconSize)).foregroundStyle(.tint)
+                        .accessibilityHidden(true)
                     Text("Welcome to Finmate")
                         .font(.system(.title, design: .rounded).weight(.bold))
                     Text("A couple of quick choices to get started.")

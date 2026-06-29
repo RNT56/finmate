@@ -100,13 +100,16 @@ final class AppLockController {
 struct AppLockOverlay: View {
     let controller: AppLockController
 
+    /// Lock-glyph size — scales with Dynamic Type alongside the title.
+    @ScaledMetric(relativeTo: .title2) private var lockIconSize: CGFloat = 44
+
     var body: some View {
         ZStack {
             FinmateGradient().ignoresSafeArea()
             GlassCard {
                 VStack(spacing: FinmateTokens.spacing) {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 44, weight: .semibold))
+                        .font(.system(size: lockIconSize, weight: .semibold))
                         .foregroundStyle(.tint)
                         .accessibilityHidden(true)
                     Text("Finmate is locked")

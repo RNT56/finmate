@@ -156,7 +156,9 @@ export function Calendar() {
             aria-label={`${MONTHS[view.month - 1]} ${view.year}`}
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(7, 1fr)',
+              // minmax(0, …) lets the 7 day columns shrink below their content
+              // width at large Dynamic-Type sizes instead of forcing H-scroll.
+              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
               gap: 6,
             }}
           >

@@ -11,8 +11,11 @@
   --fm-surface-opaque: #ffffff;
   --fm-hairline: rgba(0, 0, 0, 0.08);
   --fm-label: #0a0a0a;
-  --fm-label-secondary: rgba(60, 60, 67, 0.6);
-  --fm-label-tertiary: rgba(60, 60, 67, 0.3);
+  /* Secondary/tertiary opacities raised from iOS's .6/.3 to meet WCAG AA on
+     web glass: secondary now ≈5.1:1 on white (AA normal 4.5:1), tertiary ≈3.4:1
+     (AA large / non-text 3:1) — docs/06 §accessibility, docs/10 M7-A11Y-04. */
+  --fm-label-secondary: rgba(60, 60, 67, 0.75);
+  --fm-label-tertiary: rgba(60, 60, 67, 0.6);
   --fm-accent: #0a84ff;
   --fm-accent-pressed: #0066d6;
 
@@ -48,8 +51,10 @@
     --fm-surface-opaque: #20232b;
     --fm-hairline: rgba(255, 255, 255, 0.12);
     --fm-label: #ffffff;
+    /* Dark secondary already clears AA (≈5.9:1); tertiary raised .3→.5 to
+       reach ≈4.5:1 on the dark surface — docs/10 M7-A11Y-04. */
     --fm-label-secondary: rgba(235, 235, 245, 0.6);
-    --fm-label-tertiary: rgba(235, 235, 245, 0.3);
+    --fm-label-tertiary: rgba(235, 235, 245, 0.5);
     --fm-accent: #0a84ff;
     --fm-accent-pressed: #3b9bff;
 
@@ -75,7 +80,7 @@
   --fm-hairline: rgba(255, 255, 255, 0.12);
   --fm-label: #ffffff;
   --fm-label-secondary: rgba(235, 235, 245, 0.6);
-  --fm-label-tertiary: rgba(235, 235, 245, 0.3);
+  --fm-label-tertiary: rgba(235, 235, 245, 0.5);
   --fm-accent: #0a84ff;
   --fm-accent-pressed: #3b9bff;
 
@@ -100,8 +105,8 @@
   --fm-surface-opaque: #ffffff;
   --fm-hairline: rgba(0, 0, 0, 0.08);
   --fm-label: #0a0a0a;
-  --fm-label-secondary: rgba(60, 60, 67, 0.6);
-  --fm-label-tertiary: rgba(60, 60, 67, 0.3);
+  --fm-label-secondary: rgba(60, 60, 67, 0.75);
+  --fm-label-tertiary: rgba(60, 60, 67, 0.6);
   --fm-accent: #0a84ff;
   --fm-accent-pressed: #0066d6;
 
@@ -179,7 +184,9 @@ body {
 
 .fm-shell {
   display: grid;
-  grid-template-columns: 248px 1fr;
+  /* Sidebar width in rem so it scales with the root font (Dynamic Type / zoom)
+     instead of clipping nav labels at large text sizes. */
+  grid-template-columns: 15.5rem minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -193,10 +200,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  overflow-y: auto;
 }
 
 .fm-brand {
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   padding: 10px 12px 18px;
@@ -221,7 +229,7 @@ body {
   color: var(--fm-label-secondary);
   text-decoration: none;
   font-weight: 550;
-  font-size: 15px;
+  font-size: 0.9375rem;
   transition: background 0.18s ease, color 0.18s ease;
 }
 
@@ -246,10 +254,14 @@ body {
 .fm-main {
   padding: 28px 32px 64px;
   max-width: 920px;
+  /* Never let a wide child (table, SVG, long token) force the whole page to
+     scroll horizontally — keep overflow contained to the content column. */
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .fm-page-title {
-  font-size: 30px;
+  font-size: 1.875rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 6px 0 22px;
@@ -257,9 +269,13 @@ body {
 
 /* ---- Mobile: collapse sidebar into a bottom tab bar ---- */
 
-@media (max-width: 760px) {
+/* `em` units here are relative to the ROOT font, so a larger Dynamic-Type /
+   zoom root size raises this breakpoint and collapses the fixed sidebar into the
+   bottom tab bar before the 15.5rem column can clip the page. 47.5em ≈ 760px at
+   the 16px default. */
+@media (max-width: 47.5em) {
   .fm-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .fm-sidebar {
     position: fixed;
@@ -273,6 +289,7 @@ body {
     flex-direction: row;
     justify-content: space-around;
     z-index: 50;
+    overflow-x: auto;
   }
   .fm-brand {
     display: none;
@@ -280,12 +297,14 @@ body {
   .fm-nav-link {
     flex-direction: column;
     gap: 3px;
-    font-size: 11px;
+    font-size: 0.6875rem;
     padding: 6px 8px;
     flex: 1;
+    min-width: 0;
+    text-align: center;
   }
   .fm-main {
-    padding: 20px 16px 110px;
+    padding: 20px 16px 7rem;
   }
 }
 
@@ -313,7 +332,7 @@ body {
 }
 
 .fm-badge {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
@@ -328,7 +347,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 1.125rem;
   background: linear-gradient(135deg, rgba(10, 132, 255, 0.18), rgba(247, 147, 26, 0.18));
   color: var(--fm-accent);
   flex-shrink: 0;
@@ -382,7 +401,7 @@ body {
 }
 
 .fm-field-label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--fm-label-secondary);
   margin-bottom: 6px;
@@ -391,7 +410,7 @@ body {
 
 .fm-error {
   color: var(--fm-down);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* ---- Money-flow (M3) ribbons ---- */
@@ -411,10 +430,12 @@ body {
 }
 
 .fm-hero-amount {
-  font-size: 44px;
+  font-size: 2.75rem;
   font-weight: 750;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+  /* Long amounts (e.g. BTC + large balances) must wrap rather than overflow. */
+  overflow-wrap: anywhere;
 }
 
 /* ---- Toggle switch (Settings) — role="switch" styled as an iOS-like pill ---- */
@@ -470,7 +491,7 @@ body {
 
 .fm-btn-sm {
   padding: 6px 14px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .fm-dash-editrow {
@@ -562,18 +583,18 @@ body {
 .fm-emptystate-icon {
   width: 52px;
   height: 52px;
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 
 .fm-emptystate-title {
   font-weight: 650;
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 
 .fm-emptystate-message {
   margin: 0;
   max-width: 36ch;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.45;
 }
 
@@ -592,12 +613,12 @@ body {
 
 .fm-errorcard-title {
   font-weight: 650;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .fm-errorcard-message {
   margin: 2px 0 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.4;
 }
 
