@@ -123,8 +123,8 @@ struct MoneyFlowView: View {
     private func drawLabels(context: GraphicsContext, layout: MoneyFlowLayout, width: Double) {
         for node in layout.nodes {
             let amount = Money(minorUnits: node.valueMinor, currency: displayCurrency).formatted()
-            let title = Text(node.label).font(.caption.weight(.semibold)).foregroundStyle(.primary)
-            let value = Text(amount).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            let title = Text(node.label).font(FinmateType.caption.weight(.semibold)).foregroundStyle(.primary)
+            let value = Text(amount).font(FinmateType.money(.caption2, weight: .regular)).foregroundStyle(FinmateColor.labelSecondary)
 
             let centerY = node.y + node.h / 2
             if node.color == .income {
@@ -148,15 +148,15 @@ struct FlowWrap: View {
     var currency: CurrencyCode = .eur
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], alignment: .leading, spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: FinmateSpacing.sm)], alignment: .leading, spacing: FinmateSpacing.sm) {
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                HStack(spacing: 6) {
+                HStack(spacing: FinmateSpacing.xs + 2) {
                     Circle().fill(item.2).frame(width: 9, height: 9)
-                    Text(item.0).font(.caption)
+                    Text(item.0).font(FinmateType.caption)
                     Spacer(minLength: 4)
                     Text(Money(minorUnits: item.1, currency: currency).formatted())
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(FinmateType.money(.caption2, weight: .regular))
+                        .foregroundStyle(FinmateColor.labelSecondary)
                 }
                 .accessibilityElement(children: .combine)
             }

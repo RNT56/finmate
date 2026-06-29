@@ -52,21 +52,17 @@ export function TransactionModal({ asset, onSubmit, onClose }: Props) {
       aria-modal="true"
       aria-label={`Record transaction for ${asset.name}`}
       onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.35)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        zIndex: 100,
-      }}
+      className="fm-modal-overlay"
     >
-      <GlassCard className="fm-glass" style={{ width: 'min(440px, 100%)' }}>
+      <GlassCard className="fm-modal-sheet">
         <div onClick={(e) => e.stopPropagation()}>
-          <h2 style={{ marginTop: 0, fontSize: 20 }}>Record transaction</h2>
-          <div className="fm-secondary" style={{ fontSize: 13, marginBottom: 12 }}>
+          <h2 className="fm-modal-title" style={{ marginBottom: 'var(--fm-space-1)' }}>
+            Record transaction
+          </h2>
+          <div
+            className="fm-secondary"
+            style={{ fontSize: 'var(--fm-font-footnote)', marginBottom: 'var(--fm-space-3)' }}
+          >
             {asset.name} · {asset.currency}
           </div>
           <form className="fm-stack" onSubmit={submit}>
@@ -102,7 +98,7 @@ export function TransactionModal({ asset, onSubmit, onClose }: Props) {
               />
             </div>
 
-            <div className="fm-row" style={{ gap: 12 }}>
+            <div className="fm-row" style={{ gap: 'var(--fm-space-3)' }}>
               <div style={{ flex: 1 }}>
                 <label className="fm-field-label" htmlFor="txn-price">
                   Price per unit
@@ -133,7 +129,7 @@ export function TransactionModal({ asset, onSubmit, onClose }: Props) {
 
             {error && <div className="fm-error">{error}</div>}
 
-            <div className="fm-row" style={{ justifyContent: 'flex-end', marginTop: 4 }}>
+            <div className="fm-modal-actions">
               <button type="button" className="fm-btn fm-btn-ghost" onClick={onClose}>
                 Cancel
               </button>

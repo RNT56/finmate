@@ -107,16 +107,16 @@ struct AppLockOverlay: View {
         ZStack {
             FinmateBackground().ignoresSafeArea()
             GlassCard {
-                VStack(spacing: FinmateTokens.spacing) {
+                VStack(spacing: FinmateSpacing.lg) {
                     Image(systemName: "lock.fill")
                         .font(.system(size: lockIconSize, weight: .semibold))
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(FinmateColor.bronze)
                         .accessibilityHidden(true)
                     Text("Finmate is locked")
-                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .font(FinmateType.title2.weight(.bold))
                     Text("Authenticate to view your finances.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(FinmateType.subheadline)
+                        .foregroundStyle(FinmateColor.labelSecondary)
                         .multilineTextAlignment(.center)
                     Button {
                         Task { await controller.authenticate() }
@@ -129,9 +129,9 @@ struct AppLockOverlay: View {
                     .disabled(controller.isAuthenticating)
                     .accessibilityLabel("Unlock Finmate with Face ID or Touch ID")
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, FinmateSpacing.sm)
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, FinmateSpacing.xxxl)
             .frame(maxWidth: 400)
         }
         .transition(.opacity)

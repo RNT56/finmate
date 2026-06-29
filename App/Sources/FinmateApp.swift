@@ -142,7 +142,12 @@ struct DashboardCardValue {
     /// Optional secondary line (e.g. a gain or a count detail).
     let detail: String?
     /// Optional tint for the value (gains green, losses red); nil = primary.
+    /// Semantic discipline: plain totals/balances stay neutral — only signed
+    /// net/delta values colour (docs/06). Most cards leave this nil.
     let valueTint: Color?
+    /// Optional tint for the `detail` line — used to colour a signed gain/loss
+    /// delta (green/red) while the headline total stays neutral.
+    var detailTint: Color? = nil
 }
 
 /// Owns the Home dashboard's layout + the computed KPI values. Unidirectional
@@ -255,7 +260,9 @@ final class HomeStore {
                 title: id.title,
                 value: Money(minorUnits: portfolioValueMinor, currency: displayCurrency).formatted(),
                 detail: (gain >= 0 ? "+\(gainStr)" : gainStr) + " gain",
-                valueTint: nil)
+                // Total stays neutral; only the signed gain delta colours.
+                valueTint: nil,
+                detailTint: FinmateColor.sign(gain))
         case .upcomingCharges:
             let count = upcomingChargesCount
             return DashboardCardValue(
@@ -399,17 +406,20 @@ struct DashboardCardView: View {
 
     var body: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.sm) {
                 Text(value.title)
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(FinmateType.subheadline)
+                    .foregroundStyle(FinmateColor.labelSecondary)
                 Text(value.value)
-                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                    .font(FinmateType.money(.largeTitle, weight: .bold))
                     .minimumScaleFactor(0.6)
-                    .foregroundStyle(value.valueTint ?? .primary)
+                    .lineLimit(1)
+                    .foregroundStyle(value.valueTint ?? Color.primary)
                     .contentTransition(.numericText())
                 if let detail = value.detail {
                     Text(detail)
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(FinmateType.footnote)
+                        .foregroundStyle(value.detailTint ?? FinmateColor.labelSecondary)
                 }
             }
         }

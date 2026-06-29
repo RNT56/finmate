@@ -34,15 +34,15 @@ struct SubscriptionDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: FinmateTokens.spacing) {
+            VStack(spacing: FinmateSpacing.md) {
                 header
 
                 GlassCard {
                     VStack(spacing: 0) {
                         DetailRow(label: "Monthly", value: subscription.monthlyAmount.formatted())
-                        Divider().padding(.vertical, 8)
+                        Divider().padding(.vertical, FinmateSpacing.sm)
                         DetailRow(label: "Annual", value: annualAmount.formatted())
-                        Divider().padding(.vertical, 8)
+                        Divider().padding(.vertical, FinmateSpacing.sm)
                         DetailRow(label: "Billing", value: subscription.billingPeriod.rawValue.capitalized)
                     }
                 }
@@ -50,9 +50,9 @@ struct SubscriptionDetailView: View {
                 GlassCard {
                     VStack(spacing: 0) {
                         DetailRow(label: "Category", value: inferredCategory)
-                        Divider().padding(.vertical, 8)
+                        Divider().padding(.vertical, FinmateSpacing.sm)
                         DetailRow(label: "Usage", value: subscription.usageState.rawValue.capitalized)
-                        Divider().padding(.vertical, 8)
+                        Divider().padding(.vertical, FinmateSpacing.sm)
                         DetailRow(label: "Payment", value: paymentMethodLabel(subscription.paymentMethod))
                     }
                 }
@@ -64,11 +64,11 @@ struct SubscriptionDetailView: View {
                         GlassCard {
                             HStack {
                                 Label("Open website", systemImage: "safari.fill")
-                                    .font(.headline)
+                                    .font(FinmateType.headline)
                                 Spacer()
-                                Text(urlString).font(.caption).foregroundStyle(.secondary)
+                                Text(urlString).font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
                                 Image(systemName: "arrow.up.right.square")
-                                    .foregroundStyle(.tint)
+                                    .foregroundStyle(FinmateColor.bronze)
                                     .accessibilityHidden(true)
                             }
                         }
@@ -78,16 +78,11 @@ struct SubscriptionDetailView: View {
                     .accessibilityHint("Opens in Safari")
                 }
 
-                Button(role: .destructive) {
+                GlassButton("Delete subscription", systemImage: "trash",
+                            kind: .destructive, fullWidth: true) {
                     showingDeleteConfirm = true
-                } label: {
-                    Label("Delete subscription", systemImage: "trash")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
                 }
-                .finmateProminent()
-                .tint(.red)
-                .padding(.top, 4)
+                .padding(.top, FinmateSpacing.xs)
             }
             .padding()
         }
@@ -109,18 +104,18 @@ struct SubscriptionDetailView: View {
 
     private var header: some View {
         GlassCard {
-            HStack(spacing: 16) {
+            HStack(spacing: FinmateSpacing.lg) {
                 Image(systemName: subscription.icon ?? "creditcard.fill")
                     .font(.system(size: headerIconSize))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(FinmateColor.bronze)
                     .frame(width: headerIconSlot)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: FinmateSpacing.xs) {
                     Text(subscription.name)
-                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .font(FinmateType.title2.weight(.bold))
                     Text(subscription.monthlyAmount.formatted() + " / mo")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(FinmateType.money(.subheadline, weight: .regular))
+                        .foregroundStyle(FinmateColor.labelSecondary)
                 }
                 Spacer()
             }
@@ -157,9 +152,9 @@ struct DetailRow: View {
     let value: String
     var body: some View {
         HStack {
-            Text(label).foregroundStyle(.secondary)
+            Text(label).font(FinmateType.body).foregroundStyle(FinmateColor.labelSecondary)
             Spacer()
-            Text(value).font(.body.monospacedDigit()).fontWeight(.medium)
+            Text(value).font(FinmateType.money(.body, weight: .medium))
         }
         .accessibilityElement(children: .combine)
     }

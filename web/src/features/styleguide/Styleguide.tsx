@@ -120,7 +120,10 @@ export function Styleguide() {
 
   return (
     <Page title="Styleguide">
-      <p className="fm-secondary" style={{ marginTop: '-12px', marginBottom: 24 }}>
+      <p
+        className="fm-secondary"
+        style={{ marginTop: 'calc(-1 * var(--fm-space-3))', marginBottom: 'var(--fm-space-6)' }}
+      >
         OBSIDIAN — near-monochrome ink/graphite + a single warm bronze accent on a
         near-flat neutral. The web mirror of the iOS DesignSystem gallery.
       </p>
@@ -143,7 +146,7 @@ export function Styleguide() {
         <h2 className="fm-sg-heading">Money-flow ramp (Sankey)</h2>
         <GlassCard>
           <RampBar vars={FLOW_RAMP} />
-          <p className="fm-secondary" style={{ fontSize: 13, marginBottom: 0 }}>
+          <p className="fm-secondary" style={{ fontSize: 'var(--fm-font-footnote)', marginBottom: 0 }}>
             income · fixed · variable · subscriptions · savings
           </p>
         </GlassCard>
@@ -260,7 +263,7 @@ export function Styleguide() {
       <section className="fm-sg-section">
         <h2 className="fm-sg-heading">Spacing</h2>
         <GlassCard>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--fm-space-3)' }}>
             {SPACING.map((s) => (
               <div key={s.varName} style={{ textAlign: 'center' }}>
                 <div
@@ -268,11 +271,11 @@ export function Styleguide() {
                     width: `var(${s.varName})`,
                     height: `var(${s.varName})`,
                     background: 'var(--fm-bronze)',
-                    borderRadius: 4,
+                    borderRadius: 'var(--fm-space-1)',
                     marginInline: 'auto',
                   }}
                 />
-                <span className="fm-sg-swatch-val" style={{ fontSize: 11 }}>
+                <span className="fm-sg-swatch-val" style={{ fontSize: 'var(--fm-font-caption2)' }}>
                   {s.name}
                 </span>
               </div>

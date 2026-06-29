@@ -260,7 +260,7 @@ struct CashFlowView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: FinmateTokens.spacing) {
+                VStack(spacing: FinmateSpacing.md) {
                     if store.isLoading && !store.hasLoaded {
                         SkeletonList(count: 4)
                     } else if let error = store.loadError {
@@ -273,7 +273,7 @@ struct CashFlowView: View {
                         } actions: {
                             GlassButton("Add income", systemImage: "plus") { addingIncome = true }
                         }
-                        .padding(.top, 24)
+                        .padding(.top, FinmateSpacing.xxl)
                     } else {
                         moneyFlowCard
                         kpiGrid
@@ -336,11 +336,9 @@ struct CashFlowView: View {
 
     private var moneyFlowCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Money flow").font(.headline)
-                    Spacer()
-                    Text("This month").font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
+                SectionHeader("Money flow", systemImage: "arrow.left.arrow.right") {
+                    Text("This month").font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
                 }
                 MoneyFlowView(flow: store.moneyFlow, displayCurrency: store.displayCurrency)
                 flowLegend
@@ -361,7 +359,7 @@ struct CashFlowView: View {
     // MARK: KPI cards (docs/02 §5.3 metric set)
 
     private var kpiGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: FinmateTokens.spacing) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: FinmateSpacing.md) {
             KPICard(title: "Monthly Income", value: store.monthlyIncome.formatted(),
                     symbol: "arrow.down.circle.fill", tint: FinmateColor.up)
             KPICard(title: "Monthly Expenses", value: store.monthlyExpenses.formatted(),
@@ -382,20 +380,24 @@ struct CashFlowView: View {
 
     private var incomeVsExpensesCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Income vs expenses").font(.headline)
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
+                Text("Income vs expenses").font(FinmateType.headline)
                 Chart {
                     BarMark(x: .value("Kind", "Income"),
                             y: .value("Amount", (store.monthlyIncome.decimalValue as NSDecimalNumber).doubleValue))
                         .foregroundStyle(FinmateColor.up)
                         .annotation(position: .top) {
-                            Text(store.monthlyIncome.formatted()).font(.caption2).foregroundStyle(.secondary)
+                            Text(store.monthlyIncome.formatted())
+                                .font(FinmateType.money(.caption2, weight: .regular))
+                                .foregroundStyle(FinmateColor.labelSecondary)
                         }
                     BarMark(x: .value("Kind", "Expenses"),
                             y: .value("Amount", (store.monthlyExpenses.decimalValue as NSDecimalNumber).doubleValue))
                         .foregroundStyle(FinmateColor.bronze)
                         .annotation(position: .top) {
-                            Text(store.monthlyExpenses.formatted()).font(.caption2).foregroundStyle(.secondary)
+                            Text(store.monthlyExpenses.formatted())
+                                .font(FinmateType.money(.caption2, weight: .regular))
+                                .foregroundStyle(FinmateColor.labelSecondary)
                         }
                 }
                 .frame(height: 200)
@@ -408,19 +410,19 @@ struct CashFlowView: View {
 
     private var expenseBreakdownCard: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Expenses by category").font(.headline)
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
+                Text("Expenses by category").font(FinmateType.headline)
                 ForEach(Array(store.expenseSlices.enumerated()), id: \.element.category) { index, slice in
-                    HStack(spacing: 10) {
+                    HStack(spacing: FinmateSpacing.md) {
                         Circle().fill(color(for: index)).frame(width: 10, height: 10)
                             .accessibilityHidden(true)
-                        Text(slice.category).font(.subheadline)
+                        Text(slice.category).font(FinmateType.subheadline)
                         Spacer()
                         Text(Money(minorUnits: slice.totalMinor, currency: store.displayCurrency).formatted())
-                            .font(.subheadline.monospacedDigit())
+                            .font(FinmateType.money(.subheadline, weight: .regular))
                         Text("\(Int((slice.share * 100).rounded()))%")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .font(FinmateType.money(.caption, weight: .regular))
+                            .foregroundStyle(FinmateColor.labelSecondary)
                             .frame(width: 40, alignment: .trailing)
                     }
                     .accessibilityElement(children: .combine)
@@ -516,12 +518,8 @@ struct CashFlowView: View {
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: symbol).foregroundStyle(tint)
-                        .accessibilityHidden(true)
-                    Text(title).font(.headline)
-                    Spacer()
+            VStack(alignment: .leading, spacing: FinmateSpacing.md) {
+                SectionHeader(title, systemImage: symbol, tint: tint) {
                     Button(action: add) { Image(systemName: "plus.circle.fill") }
                         .accessibilityLabel(addLabel)
                 }
@@ -531,20 +529,20 @@ struct CashFlowView: View {
     }
 
     private func emptyRow(_ text: String) -> some View {
-        Text(text).font(.subheadline).foregroundStyle(.secondary)
+        Text(text).font(FinmateType.subheadline).foregroundStyle(FinmateColor.labelSecondary)
     }
 
     private func flowEntryRow(
         name: String, detail: String, amount: String,
         edit: @escaping () -> Void, delete: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.subheadline.weight(.medium))
-                Text(detail).font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: FinmateSpacing.md) {
+            VStack(alignment: .leading, spacing: FinmateSpacing.xs / 2) {
+                Text(name).font(FinmateType.subheadline.weight(.medium))
+                Text(detail).font(FinmateType.caption).foregroundStyle(FinmateColor.labelSecondary)
             }
             Spacer()
-            Text(amount).font(.subheadline.monospacedDigit())
+            Text(amount).font(FinmateType.money(.subheadline, weight: .regular))
             Button(action: delete) {
                 Image(systemName: "trash").foregroundStyle(FinmateColor.down)
             }
@@ -641,7 +639,7 @@ struct IncomeFormView: View {
                     TextField("Amount", text: $amount).keyboardType(.decimalPad)
                     CurrencyPickerRow(currency: $currency)
                     if let amountError {
-                        Text(amountError).font(.caption).foregroundStyle(.red)
+                        Text(amountError).font(FinmateType.caption).foregroundStyle(FinmateColor.down)
                     }
                 }
                 Section("Schedule") {
@@ -718,7 +716,7 @@ struct FixedExpenseFormView: View {
                     TextField("Amount", text: $amount).keyboardType(.decimalPad)
                     CurrencyPickerRow(currency: $currency)
                     if let amountError {
-                        Text(amountError).font(.caption).foregroundStyle(.red)
+                        Text(amountError).font(FinmateType.caption).foregroundStyle(FinmateColor.down)
                     }
                 }
                 Section("Schedule") {
@@ -793,7 +791,7 @@ struct VariableExpenseFormView: View {
                     TextField("Amount", text: $amount).keyboardType(.decimalPad)
                     CurrencyPickerRow(currency: $currency)
                     if let amountError {
-                        Text(amountError).font(.caption).foregroundStyle(.red)
+                        Text(amountError).font(FinmateType.caption).foregroundStyle(FinmateColor.down)
                     }
                 }
                 Section("Date") {

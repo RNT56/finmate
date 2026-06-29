@@ -75,7 +75,7 @@ export function MoneyFlow({
       {empty ? (
         <div
           className="fm-secondary"
-          style={{ padding: '24px 0', textAlign: 'center' }}
+          style={{ padding: 'var(--fm-space-6) 0', textAlign: 'center' }}
         >
           No income or expenses tracked yet.
         </div>

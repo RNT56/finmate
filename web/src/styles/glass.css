@@ -24,9 +24,9 @@
 
   /* BRONZE — the single signature accent. --fm-accent now == bronze so every
      existing var(--fm-accent) reference recolors from blue → bronze. */
-  --fm-bronze: #9a7544;
+  --fm-bronze: #8a6a3c;
   --fm-bronze-deep: #7e5f33;
-  --fm-accent: #9a7544;
+  --fm-accent: #8a6a3c;
   --fm-accent-pressed: #7e5f33;
 
   /* ---- financial semantics (kept) ---- */
@@ -225,9 +225,9 @@
   --fm-ink: #1a1c20;
   --fm-ink-on: #ffffff;
 
-  --fm-bronze: #9a7544;
+  --fm-bronze: #8a6a3c;
   --fm-bronze-deep: #7e5f33;
-  --fm-accent: #9a7544;
+  --fm-accent: #8a6a3c;
   --fm-accent-pressed: #7e5f33;
 
   --fm-up: #248a3d;
@@ -952,6 +952,67 @@ body {
     animation: none;
     display: none;
   }
+}
+
+/* ---- List link (More hub rows) — hover + visible focus ring ---- */
+.fm-list-link {
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--fm-motion-fast) ease;
+}
+
+.fm-list-link:hover {
+  background: var(--fm-hairline);
+}
+
+.fm-list-link:focus-visible {
+  outline: 2px solid var(--fm-bronze);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-list-link {
+    transition: none;
+  }
+}
+
+/* ---- Calendar day cell — visible bronze focus ring for keyboard nav ---- */
+.fm-cal-day:focus-visible {
+  outline: 2px solid var(--fm-bronze);
+  outline-offset: 1px;
+}
+
+/* ---- Modal (add/edit dialogs) — one shared overlay + sheet treatment ---- */
+.fm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fm-space-4);
+  z-index: 100;
+}
+
+.fm-modal-sheet {
+  width: min(440px, 100%);
+  max-height: calc(100vh - 2 * var(--fm-space-4));
+  overflow-y: auto;
+}
+
+.fm-modal-title {
+  margin: 0 0 var(--fm-space-4);
+  font-size: var(--fm-font-title3);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.fm-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--fm-space-2);
+  margin-top: var(--fm-space-1);
 }
 
 /* ---- Auth / onboarding ---- */

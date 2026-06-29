@@ -30,7 +30,7 @@ const ITEMS: MoreItem[] = [
     to: '/import',
     icon: '↧',
     title: 'Import CSV',
-    subtitle: 'Preview and validate a subscriptions CSV before importing',
+    subtitle: 'Validate and preview your data before importing',
   },
   {
     to: '/settings',
@@ -56,12 +56,10 @@ export function More() {
               <li key={item.to}>
                 <Link
                   to={item.to}
-                  className="fm-row"
+                  className="fm-row fm-list-link"
                   style={{
-                    padding: '14px 16px',
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    borderTop: i === 0 ? 'none' : '1px solid var(--fm-glass-border)',
+                    padding: 'var(--fm-space-3) var(--fm-space-4)',
+                    borderTop: i === 0 ? 'none' : '1px solid var(--fm-hairline)',
                   }}
                 >
                   <span className="fm-icon-tile" aria-hidden="true">
@@ -69,7 +67,7 @@ export function More() {
                   </span>
                   <span style={{ flex: 1 }}>
                     <span style={{ fontWeight: 600, display: 'block' }}>{item.title}</span>
-                    <span className="fm-secondary" style={{ fontSize: 13 }}>
+                    <span className="fm-secondary" style={{ fontSize: 'var(--fm-font-footnote)' }}>
                       {item.subtitle}
                     </span>
                   </span>

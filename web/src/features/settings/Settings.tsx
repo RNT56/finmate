@@ -146,8 +146,7 @@ export function Settings() {
           >
             <button
               type="button"
-              className="fm-btn fm-btn-ghost"
-              style={{ padding: '0.5rem 0.875rem', fontSize: '0.8125rem' }}
+              className="fm-btn fm-btn-ghost fm-btn-sm"
               aria-label="Export your data as JSON"
               onClick={handleExport}
             >
@@ -160,12 +159,7 @@ export function Settings() {
           >
             <button
               type="button"
-              className="fm-btn"
-              style={{
-                padding: '0.5rem 0.875rem',
-                fontSize: '0.8125rem',
-                background: 'var(--fm-down)',
-              }}
+              className="fm-btn fm-btn-destructive fm-btn-sm"
               aria-label="Delete your account permanently"
               onClick={() =>
                 window.alert(
@@ -190,8 +184,7 @@ export function Settings() {
           >
             <button
               type="button"
-              className="fm-btn fm-btn-ghost"
-              style={{ padding: '0.5rem 0.875rem', fontSize: '0.8125rem' }}
+              className="fm-btn fm-btn-ghost fm-btn-sm"
               aria-label="Log out"
               onClick={() => {
                 void signOut();

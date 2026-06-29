@@ -6,6 +6,7 @@
 
 import { useMemo, useState, type DragEvent, type ReactNode } from 'react';
 import { GlassCard } from './GlassCard';
+import { Skeleton } from './Skeleton';
 import { Page } from './AppShell';
 import { useSubscriptions } from '../features/subscriptions/useSubscriptions';
 import { useCashFlow } from '../features/cashflow/useCashFlow';
@@ -22,8 +23,11 @@ interface CardContent {
   label: string;
   value: string;
   detail?: string;
-  /** 'up' | 'down' tints the value (gain/loss, net sign); undefined = neutral. */
+  /** Tints the main VALUE — only for genuinely signed figures (net, savings rate).
+   *  Totals/balances stay neutral (semantic-color discipline, checklist H). */
   tone?: 'up' | 'down';
+  /** Tints the DETAIL line — used for a +gain / −loss delta beneath a neutral total. */
+  detailTone?: 'up' | 'down';
 }
 
 function formatSignedMoney(minor: number, currency: CurrencyCode): string {
@@ -83,9 +87,10 @@ function useCardContent(): { content: Record<DashboardCardId, CardContent>; load
     },
     portfolioValue: {
       label: cardTitles.portfolioValue,
+      // The total is a balance → NEUTRAL. Only the gain/loss delta is coloured.
       value: fmt(totalValueMinor),
       detail: `${formatSignedMoney(totalGainMinor, currency)} (${(totalGainPct * 100).toFixed(1)}%)`,
-      tone: totalGainMinor >= 0 ? 'up' : 'down',
+      detailTone: totalGainMinor >= 0 ? 'up' : 'down',
     },
     upcomingCharges: {
       label: cardTitles.upcomingCharges,
@@ -105,27 +110,38 @@ function useCardContent(): { content: Record<DashboardCardId, CardContent>; load
   };
 }
 
+const toneColor = (tone?: 'up' | 'down') =>
+  tone === 'up' ? 'var(--fm-up)' : tone === 'down' ? 'var(--fm-down)' : undefined;
+
 function ValueCard({ content }: { content: CardContent }) {
-  const toneColor =
-    content.tone === 'up'
-      ? 'var(--fm-up)'
-      : content.tone === 'down'
-        ? 'var(--fm-down)'
-        : 'var(--fm-label)';
   return (
     <>
-      <div className="fm-secondary" style={{ fontWeight: 600, fontSize: 14 }}>
+      <div
+        className="fm-secondary"
+        style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)' }}
+      >
         {content.label}
       </div>
       <div
         className="fm-amount"
-        style={{ fontSize: '1.75rem', marginTop: 6, color: toneColor }}
+        style={{
+          fontSize: 'var(--fm-font-title1)',
+          marginTop: 'var(--fm-space-2)',
+          color: toneColor(content.tone) ?? 'var(--fm-label)',
+        }}
         aria-live="polite"
       >
         {content.value}
       </div>
       {content.detail && (
-        <div className="fm-secondary" style={{ marginTop: 4, fontSize: 13 }}>
+        <div
+          className={content.detailTone ? 'fm-amount' : 'fm-secondary'}
+          style={{
+            marginTop: 'var(--fm-space-1)',
+            fontSize: 'var(--fm-font-footnote)',
+            color: toneColor(content.detailTone),
+          }}
+        >
           {content.detail}
         </div>
       )}
@@ -179,10 +195,10 @@ export function Home() {
       <Page title="Home">
         <div className="fm-stack">
           <div className="fm-dash-toolbar">
-            <div className="fm-secondary" style={{ fontSize: 14 }}>
+            <div className="fm-secondary" style={{ fontSize: 'var(--fm-font-subheadline)' }}>
               Drag, or use the arrows, to reorder. Toggle a card to show or hide it.
             </div>
-            <div className="fm-row" style={{ gap: 8 }}>
+            <div className="fm-row" style={{ gap: 'var(--fm-space-2)' }}>
               <button type="button" className="fm-btn fm-btn-ghost fm-btn-sm" onClick={layout.reset}>
                 Reset
               </button>
@@ -236,7 +252,7 @@ export function Home() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600 }}>{cardTitles[id]}</div>
-                        <div className="fm-secondary" style={{ fontSize: 13 }}>
+                        <div className="fm-secondary" style={{ fontSize: 'var(--fm-font-footnote)' }}>
                           {content[id].value}
                         </div>
                       </div>
@@ -266,7 +282,28 @@ export function Home() {
   const visible = layout.visibleOrder;
   const renderCard = (id: DashboardCardId): ReactNode => (
     <GlassCard key={id}>
-      <ValueCard content={loading ? { ...content[id], value: '—', detail: undefined } : content[id]} />
+      {loading ? (
+        <>
+          <div
+            className="fm-secondary"
+            style={{ fontWeight: 600, fontSize: 'var(--fm-font-subheadline)' }}
+          >
+            {content[id].label}
+          </div>
+          <Skeleton
+            width="60%"
+            height={28}
+            style={{ marginTop: 'var(--fm-space-2)' }}
+          />
+          <Skeleton
+            width="40%"
+            height={13}
+            style={{ marginTop: 'var(--fm-space-2)' }}
+          />
+        </>
+      ) : (
+        <ValueCard content={content[id]} />
+      )}
     </GlassCard>
   );
 
@@ -274,7 +311,7 @@ export function Home() {
     <Page title="Home">
       <div className="fm-stack">
         <div className="fm-dash-toolbar">
-          <div className="fm-secondary" style={{ fontSize: 14 }}>
+          <div className="fm-secondary" style={{ fontSize: 'var(--fm-font-subheadline)' }}>
             Your overview at a glance
           </div>
           {editToggle}
@@ -283,7 +320,7 @@ export function Home() {
         {visible.length === 0 ? (
           <GlassCard>
             <div className="fm-empty">
-              No cards shown. Tap <strong>Edit</strong> to add some back.
+              No cards shown. Choose <strong>Edit</strong> to add some back.
             </div>
           </GlassCard>
         ) : (
