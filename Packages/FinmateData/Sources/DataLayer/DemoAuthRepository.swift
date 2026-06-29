@@ -70,4 +70,8 @@ public actor DemoAuthRepository: AuthRepository {
     public func signOut() async throws {
         emit(.signedOut)
     }
+
+    /// No-op success: the offline demo path has no backend to email, so a reset
+    /// request simply succeeds (the UI shows the neutral confirmation).
+    public func sendPasswordReset(email: String) async throws {}
 }

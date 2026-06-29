@@ -80,4 +80,9 @@ public struct SupabaseAuthRepository: AuthRepository {
         let client = await provider.client()
         try await client.auth.signOut()
     }
+
+    public func sendPasswordReset(email: String) async throws {
+        let client = await provider.client()
+        try await client.auth.resetPasswordForEmail(email)
+    }
 }

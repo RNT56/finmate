@@ -36,6 +36,9 @@ export interface AuthContextValue {
   signInWithApple: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
+  /** Send a password-reset email. Resolves without a network call in demo mode;
+   *  callers show a neutral confirmation (never revealing whether the account exists). */
+  resetPassword: (email: string) => Promise<void>;
   /** Enter the offline demo (in-memory signed-in user). */
   signInDemo: () => void;
   signOut: () => Promise<void>;
@@ -128,6 +131,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [supabase],
   );
 
+  const resetPassword = useCallback(
+    async (email: string) => {
+      // Demo / no backend: acknowledge without any network call.
+      if (!supabase) return;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+    },
+    [supabase],
+  );
+
   const signInDemo = useCallback(() => {
     setUser(DEMO_USER);
     setStatus('authenticated');
@@ -150,10 +165,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithApple,
       signIn,
       signUp,
+      resetPassword,
       signInDemo,
       signOut,
     }),
-    [status, user, signInWithApple, signIn, signUp, signInDemo, signOut],
+    [status, user, signInWithApple, signIn, signUp, resetPassword, signInDemo, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

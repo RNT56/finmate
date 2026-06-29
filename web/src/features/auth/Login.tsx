@@ -10,12 +10,33 @@ import { useAuth } from './useAuth';
 type Mode = 'signIn' | 'signUp';
 
 export function Login() {
-  const { signInWithApple, signIn, signUp, signInDemo, isConfigured } = useAuth();
+  const { signInWithApple, signIn, signUp, resetPassword, signInDemo, isConfigured } = useAuth();
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // "Forgot password?" inline flow: the reset address is kept separate from the
+  // sign-in email; on success we show a neutral confirmation (never revealing
+  // whether an account exists for the address).
+  const [showingReset, setShowingReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetInfo, setResetInfo] = useState<string | null>(null);
+  const resetEmailValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(resetEmail.trim());
+
+  const sendReset = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await resetPassword(resetEmail.trim());
+      setResetInfo('If an account exists, a reset link has been sent.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send the reset email.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -123,6 +144,67 @@ export function Login() {
               {mode === 'signIn' ? 'Sign in' : 'Create account'}
             </button>
           </form>
+
+          {/* Forgot password? — inline reset flow (sign-in mode only). */}
+          {mode === 'signIn' && !showingReset && (
+            <button
+              type="button"
+              className="fm-btn fm-btn-ghost"
+              style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem', fontSize: '0.8125rem' }}
+              data-testid="forgot-password"
+              onClick={() => {
+                setShowingReset(true);
+                setResetEmail(email);
+                setResetInfo(null);
+                setError(null);
+              }}
+            >
+              Forgot password?
+            </button>
+          )}
+          {showingReset && (
+            <form className="fm-stack" style={{ gap: '0.5rem', marginTop: '0.75rem' }} onSubmit={sendReset}>
+              <label className="fm-stack" style={{ gap: '0.25rem' }}>
+                <span className="fm-secondary" style={{ fontSize: '0.8125rem' }}>
+                  Reset email
+                </span>
+                <input
+                  type="email"
+                  className="fm-input"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  autoComplete="email"
+                  aria-label="Reset email"
+                  data-testid="reset-email"
+                />
+              </label>
+              {resetInfo && (
+                <div role="status" className="fm-secondary" style={{ fontSize: '0.8125rem' }}>
+                  {resetInfo}
+                </div>
+              )}
+              <button
+                type="submit"
+                className="fm-btn"
+                style={{ width: '100%', justifyContent: 'center' }}
+                disabled={busy || !resetEmailValid}
+                data-testid="reset-send"
+              >
+                Send reset link
+              </button>
+              <button
+                type="button"
+                className="fm-btn fm-btn-ghost"
+                style={{ width: '100%', justifyContent: 'center', fontSize: '0.8125rem' }}
+                onClick={() => {
+                  setShowingReset(false);
+                  setResetInfo(null);
+                }}
+              >
+                Back to sign in
+              </button>
+            </form>
+          )}
 
           <button
             type="button"

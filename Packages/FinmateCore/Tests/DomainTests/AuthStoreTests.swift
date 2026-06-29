@@ -43,6 +43,7 @@ private actor StubAuthRepository: AuthRepository {
     func signIn(email: String, password: String) async throws -> AuthUser { try result() }
     func signUp(email: String, password: String) async throws -> AuthUser { try result() }
     func signOut() async throws { if shouldThrow { throw StubError.boom } }
+    func sendPasswordReset(email: String) async throws { if shouldThrow { throw StubError.boom } }
 }
 
 @MainActor
@@ -102,6 +103,26 @@ struct AuthStoreTests {
         #expect(store.isBusy == false)
     }
 
+    @Test func sendPasswordResetSuccessSurfacesConfirmation() async {
+        let store = AuthStore(repository: StubAuthRepository())
+        await store.start()
+        await store.sendPasswordReset(email: "a@b.com")
+        #expect(store.infoMessage == "If an account exists, a reset link has been sent.")
+        #expect(store.errorMessage == nil)
+        #expect(store.isBusy == false)
+        // The reset must not change the session state.
+        #expect(store.state == .signedOut)
+    }
+
+    @Test func failedPasswordResetSurfacesError() async {
+        let store = AuthStore(repository: StubAuthRepository(shouldThrow: true))
+        await store.start()
+        await store.sendPasswordReset(email: "a@b.com")
+        #expect(store.errorMessage == "stub failure")
+        #expect(store.infoMessage == nil)
+        #expect(store.isBusy == false)
+    }
+
     @Test func demoRepositorySignsInAsDemoUser() async {
         let demo = DemoStubRepository()
         let store = AuthStore(repository: demo)
@@ -123,4 +144,5 @@ private actor DemoStubRepository: AuthRepository {
     func signIn(email: String, password: String) async throws -> AuthUser { Self.demoUser }
     func signUp(email: String, password: String) async throws -> AuthUser { Self.demoUser }
     func signOut() async throws {}
+    func sendPasswordReset(email: String) async throws {}
 }

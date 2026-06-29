@@ -45,9 +45,22 @@ struct AuthView: View {
     @State private var password = ""
     @State private var currentNonce: String?
 
+    /// Whether the inline "forgot password" reset field is showing.
+    @State private var showingReset = false
+    /// The address typed into the reset field (kept separate from sign-in email).
+    @State private var resetEmail = ""
+
     /// Minimal client-side validation: a plausible email + a >= 8-char password.
     private var emailIsValid: Bool {
-        let trimmed = email.trimmingCharacters(in: .whitespaces)
+        Self.isPlausibleEmail(email)
+    }
+    /// Client-side validation for the reset address.
+    private var resetEmailIsValid: Bool {
+        Self.isPlausibleEmail(resetEmail)
+    }
+
+    private static func isPlausibleEmail(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
         return trimmed.contains("@") && trimmed.contains(".") && trimmed.count >= 5
     }
     private var passwordIsValid: Bool { password.count >= 8 }
@@ -69,12 +82,23 @@ struct AuthView: View {
                         emailPasswordFields
                         submitButton
 
+                        if mode == .signIn {
+                            forgotPasswordSection
+                        }
+
                         if let error = store.errorMessage {
                             Text(error)
                                 .font(.footnote)
                                 .foregroundStyle(.red)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .accessibilityLabel("Error: \(error)")
+                        }
+                        if let info = store.infoMessage {
+                            Text(info)
+                                .font(.footnote)
+                                .foregroundStyle(.green)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .accessibilityLabel(info)
                         }
 
                         dividerOr
@@ -148,6 +172,41 @@ struct AuthView: View {
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .disabled(!formIsValid)
+    }
+
+    /// "Forgot password?" affordance + an inline reset field that posts the email
+    /// to `AuthStore.sendPasswordReset`. The confirmation surfaces via `infoMessage`.
+    @ViewBuilder
+    private var forgotPasswordSection: some View {
+        if showingReset {
+            VStack(spacing: 10) {
+                TextField("Email for reset link", text: $resetEmail)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Email for password reset")
+                Button {
+                    Task { await store.sendPasswordReset(email: resetEmail) }
+                } label: {
+                    Text("Send reset link").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(!resetEmailIsValid)
+                .accessibilityIdentifier("auth.sendReset")
+            }
+            .transition(.opacity)
+        } else {
+            Button("Forgot password?") {
+                resetEmail = email
+                withAnimation { showingReset = true }
+            }
+            .font(.footnote)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .accessibilityIdentifier("auth.forgotPassword")
+        }
     }
 
     private var dividerOr: some View {
