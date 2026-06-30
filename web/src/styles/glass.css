@@ -94,10 +94,19 @@
     system-ui, sans-serif;
 
   /* ---- motion ---- */
+  /* Subtle + fast, Apple-grade. Durations stay short so the UI feels instant;
+     the spring-ish curves add a touch of overshoot/settle (mirrors the iOS 26
+     `.spring`/`.smooth` glass motion). Every animation that uses these is gated
+     by the prefers-reduced-motion block at the foot of this file. */
   --fm-motion-fast: 0.15s;
   --fm-motion-base: 0.25s;
   --fm-motion-slow: 0.4s;
+  /* Gentle overshoot — selection moves, knobs, presses that should feel springy. */
   --fm-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Crisp deceleration — enters / appearance (no overshoot, settles fast). */
+  --fm-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Standard in-out for hovers / color shifts. */
+  --fm-ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ---- glass surface (translucent + blur); reduce-transparency falls back ---- */
   --fm-glass-fill: rgba(255, 255, 255, 0.62);
@@ -386,13 +395,19 @@ body {
   font-weight: 550;
   font-size: 0.9375rem;
   transition:
-    background var(--fm-motion-fast) ease,
-    color var(--fm-motion-fast) ease;
+    background var(--fm-motion-fast) var(--fm-ease-inout),
+    color var(--fm-motion-fast) var(--fm-ease-inout),
+    transform var(--fm-motion-base) var(--fm-spring);
 }
 
 .fm-nav-link:hover {
   color: var(--fm-label);
   background: var(--fm-hairline);
+}
+
+.fm-nav-link:active {
+  transform: scale(0.97);
+  transition-duration: 0.04s;
 }
 
 /* Active nav uses the bronze accent (tinted fill + bronze label + left rail). */
@@ -561,18 +576,23 @@ body {
   cursor: pointer;
   color: var(--fm-ink-on);
   background: var(--fm-ink);
+  /* Consistent press feedback across every button variant: the springy
+     transform settles on release; color/shadow ease independently. */
   transition:
-    background var(--fm-motion-fast) ease,
-    transform 0.05s ease,
-    box-shadow var(--fm-motion-fast) ease;
+    background var(--fm-motion-fast) var(--fm-ease-inout),
+    transform var(--fm-motion-base) var(--fm-spring),
+    box-shadow var(--fm-motion-fast) var(--fm-ease-inout);
 }
 
 .fm-btn:hover {
   background: color-mix(in srgb, var(--fm-ink) 86%, var(--fm-label-secondary));
 }
 
+/* Press = a quick, near-instant scale-down (no spring on the way in so it feels
+   crisp); release springs back via the base transition above. */
 .fm-btn:active {
-  transform: scale(0.98);
+  transform: scale(0.96);
+  transition-duration: 0.04s;
 }
 
 .fm-btn:focus-visible {
@@ -650,13 +670,20 @@ body {
   border-radius: var(--fm-radius-pill);
   color: var(--fm-label-secondary);
   background: transparent;
+  /* The selection move springs (background travels between segments); press
+     scales subtly. */
   transition:
-    background var(--fm-motion-fast) ease,
-    color var(--fm-motion-fast) ease;
+    background var(--fm-motion-base) var(--fm-spring),
+    color var(--fm-motion-fast) var(--fm-ease-inout),
+    transform var(--fm-motion-fast) var(--fm-ease-inout);
 }
 
 .fm-segment-item:hover {
   color: var(--fm-label);
+}
+
+.fm-segment-item:active {
+  transform: scale(0.95);
 }
 
 .fm-segment-item[aria-pressed='true'],
@@ -807,11 +834,18 @@ body {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  transition: background var(--fm-motion-fast) ease;
+  transition:
+    background var(--fm-motion-fast) var(--fm-ease-inout),
+    transform var(--fm-motion-base) var(--fm-spring);
 }
 
 .fm-iconbtn:hover:not(:disabled) {
   background: var(--fm-hairline);
+}
+
+.fm-iconbtn:active:not(:disabled) {
+  transform: scale(0.92);
+  transition-duration: 0.04s;
 }
 
 .fm-iconbtn:focus-visible {
@@ -937,14 +971,55 @@ body {
   }
 }
 
+/* ---- List row enter (add) — labeled lists (Subscriptions, income/expense
+   groups). A subtle fade + lift-in so a freshly added row settles in rather than
+   popping. CSS-only on mount; removal is an unmount (no exit delay → no e2e
+   flake). ---- */
+ul[aria-label] > li {
+  animation: fm-row-in var(--fm-motion-base) var(--fm-ease-out);
+}
+
+@keyframes fm-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---- Value-change transition — amounts (KPIs, hero balances, row figures)
+   ease their color on change (e.g. a currency switch or an edit recompute) for
+   a gentle, non-distracting update. Color-only so layout/text stay stable for
+   the e2e €/$ assertions. ---- */
+.fm-amount,
+.fm-hero-amount {
+  transition: color var(--fm-motion-base) var(--fm-ease-inout);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fm-toggle,
   .fm-toggle-knob,
   .fm-nav-link,
   .fm-btn,
   .fm-segment-item,
-  .fm-iconbtn {
+  .fm-iconbtn,
+  .fm-amount,
+  .fm-hero-amount {
     transition: none;
+  }
+
+  /* No press/selection scaling when reduced motion is requested. */
+  .fm-btn:active,
+  .fm-segment-item:active,
+  .fm-iconbtn:active:not(:disabled),
+  .fm-nav-link:active {
+    transform: none;
+  }
+
+  /* Modal + list-row enter animations collapse to an instant appearance. */
+  .fm-modal-overlay,
+  .fm-modal-sheet,
+  ul[aria-label] > li {
+    animation: none;
   }
 
   /* No travelling shimmer — keep a static, still-visible placeholder block. */
@@ -983,6 +1058,9 @@ body {
 }
 
 /* ---- Modal (add/edit dialogs) — one shared overlay + sheet treatment ---- */
+/* Enter motion is CSS-only on mount (the modal unmounts on close, so there is
+   no JS exit delay that could flake the e2e `toBeHidden` assertions): the
+   backdrop fades in and the sheet fades + scales up from a touch below. */
 .fm-modal-overlay {
   position: fixed;
   inset: 0;
@@ -992,12 +1070,28 @@ body {
   justify-content: center;
   padding: var(--fm-space-4);
   z-index: 100;
+  animation: fm-overlay-in var(--fm-motion-base) var(--fm-ease-out);
 }
 
 .fm-modal-sheet {
   width: min(440px, 100%);
   max-height: calc(100vh - 2 * var(--fm-space-4));
   overflow-y: auto;
+  animation: fm-sheet-in var(--fm-motion-base) var(--fm-ease-out);
+  transform-origin: center bottom;
+}
+
+@keyframes fm-overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fm-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
 }
 
 .fm-modal-title {

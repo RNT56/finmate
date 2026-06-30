@@ -295,6 +295,8 @@ struct HomeView: View {
     @Environment(\.repositories) private var repositories
     @Environment(PreferencesStore.self) private var preferences
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Namespace for the dashboard cards' Liquid Glass morph (read ⇄ edit mode).
+    @Namespace private var glassNamespace
 
     var body: some View {
         NavigationStack {
@@ -310,15 +312,17 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(store.isEditing ? "Done" : "Edit") {
-                        store.isEditing.toggle()
+                        withAnimation(reduceMotion ? nil : FinmateMotion.glassSpring) {
+                            store.isEditing.toggle()
+                        }
                     }
                     .accessibilityHint(store.isEditing
                                        ? "Finish customizing the dashboard"
                                        : "Reorder or hide dashboard cards")
                 }
             }
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.isEditing)
-            .animation(reduceMotion ? nil : .default, value: store.layout)
+            .animation(reduceMotion ? nil : FinmateMotion.glassSpring, value: store.isEditing)
+            .animation(reduceMotion ? nil : FinmateMotion.glassSpring, value: store.layout)
             .task {
                 if !didBind {
                     let rates = (try? await repositories.exchangeRates.latestRates()) ?? AssetsSampleData.sampleRates
@@ -341,9 +345,17 @@ struct HomeView: View {
 
     private var dashboard: some View {
         ScrollView {
-            VStack(spacing: FinmateSpacing.md) {
-                ForEach(store.layout.cardOrder) { id in
-                    DashboardCardView(value: store.value(for: id))
+            // Group the dashboard cards in one GlassEffectContainer so iOS 26 blends
+            // the glass surfaces and the cards can MORPH (glassEffectID) when entering
+            // / leaving edit-mode. No-op container ≤25. Spacing matches the VStack.
+            FinmateGlassGroup(spacing: FinmateSpacing.md) {
+                VStack(spacing: FinmateSpacing.md) {
+                    ForEach(store.layout.cardOrder) { id in
+                        DashboardCardView(value: store.value(for: id))
+                            .finmateGlassMorph(id: id, in: glassNamespace,
+                                               reduceMotion: reduceMotion)
+                            .transition(.finmateRow)
+                    }
                 }
             }
             .padding()

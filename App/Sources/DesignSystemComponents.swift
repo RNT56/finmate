@@ -42,6 +42,7 @@ struct GlassButton: View {
     @ScaledMetric(relativeTo: .body) private var vPadSm: CGFloat = 6
     @ScaledMetric(relativeTo: .body) private var vPadMd: CGFloat = 10
     @ScaledMetric(relativeTo: .body) private var hPad: CGFloat = 16
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let button = Button(action: action) {
@@ -52,6 +53,10 @@ struct GlassButton: View {
         }
         styled(button)
             .tint(tint)
+            // Subtle, fast press feedback (scale + opacity dip) layered over the
+            // system glass/bordered style — transform only, so the Liquid Glass look
+            // is preserved. Reduce-motion-gated; also fires a light haptic.
+            .modifier(PressScale(reduceMotion: reduceMotion))
     }
 
     @ViewBuilder private var label: some View {

@@ -217,6 +217,7 @@ struct AssetsView: View {
     @State private var didBind = false
     @State private var addingAsset = false
     @State private var editingAsset: FinancialAsset?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollView {
@@ -236,8 +237,16 @@ struct AssetsView: View {
                     .padding(.top, FinmateSpacing.xxl)
                 } else {
                     currencySwitcher
-                    portfolioHeader
-                    if !store.distribution.isEmpty { distributionCard }
+                    // Group the portfolio + allocation glass surfaces so iOS 26 blends
+                    // them (no-op container ≤25); the spring animates the portfolio
+                    // value/gain figures + donut when the display currency switches.
+                    FinmateGlassGroup(spacing: FinmateSpacing.md) {
+                        VStack(spacing: FinmateSpacing.md) {
+                            portfolioHeader
+                            if !store.distribution.isEmpty { distributionCard }
+                        }
+                    }
+                    .animation(reduceMotion ? nil : FinmateMotion.baseEase, value: store.displayCurrency)
                     holdingsList
                 }
             }
@@ -403,8 +412,12 @@ struct AssetsView: View {
                         Task { await store.deleteAsset(id: asset.id) }
                     } label: { Label("Delete", systemImage: "trash") }
                 }
+                .transition(.finmateRow)
             }
         }
+        // Animate holding insert/remove (add / delete) with the glass spring,
+        // keyed on identities. Reduce-motion-gated.
+        .animation(reduceMotion ? nil : FinmateMotion.glassSpring, value: store.assets.map(\.id))
     }
 
     private func gainPctText(_ pct: Double) -> String {
