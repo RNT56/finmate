@@ -35,26 +35,32 @@ struct SubscriptionDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: FinmateSpacing.md) {
-                header
+                // Group the detail's stacked glass surfaces so iOS 26 blends them as
+                // one cluster (no-op container ≤25).
+                FinmateGlassGroup(spacing: FinmateSpacing.md) {
+                  VStack(spacing: FinmateSpacing.md) {
+                    header
 
-                GlassCard {
-                    VStack(spacing: 0) {
-                        DetailRow(label: "Monthly", value: subscription.monthlyAmount.formatted())
-                        Divider().padding(.vertical, FinmateSpacing.sm)
-                        DetailRow(label: "Annual", value: annualAmount.formatted())
-                        Divider().padding(.vertical, FinmateSpacing.sm)
-                        DetailRow(label: "Billing", value: subscription.billingPeriod.rawValue.capitalized)
+                    GlassCard {
+                        VStack(spacing: 0) {
+                            DetailRow(label: "Monthly", value: subscription.monthlyAmount.formatted())
+                            Divider().padding(.vertical, FinmateSpacing.sm)
+                            DetailRow(label: "Annual", value: annualAmount.formatted())
+                            Divider().padding(.vertical, FinmateSpacing.sm)
+                            DetailRow(label: "Billing", value: subscription.billingPeriod.rawValue.capitalized)
+                        }
                     }
-                }
 
-                GlassCard {
-                    VStack(spacing: 0) {
-                        DetailRow(label: "Category", value: inferredCategory)
-                        Divider().padding(.vertical, FinmateSpacing.sm)
-                        DetailRow(label: "Usage", value: subscription.usageState.rawValue.capitalized)
-                        Divider().padding(.vertical, FinmateSpacing.sm)
-                        DetailRow(label: "Payment", value: paymentMethodLabel(subscription.paymentMethod))
+                    GlassCard {
+                        VStack(spacing: 0) {
+                            DetailRow(label: "Category", value: inferredCategory)
+                            Divider().padding(.vertical, FinmateSpacing.sm)
+                            DetailRow(label: "Usage", value: subscription.usageState.rawValue.capitalized)
+                            Divider().padding(.vertical, FinmateSpacing.sm)
+                            DetailRow(label: "Payment", value: paymentMethodLabel(subscription.paymentMethod))
+                        }
                     }
+                  }
                 }
 
                 if let urlString = subscription.vendorURL, let url = vendorURL(from: urlString) {

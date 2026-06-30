@@ -254,6 +254,7 @@ struct CashFlowView: View {
     @State private var addingFixed = false
     @State private var editingVariable: VariableExpense?
     @State private var addingVariable = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private func color(for index: Int) -> Color { FinmateColor.ramp(index) }
 
@@ -359,16 +360,26 @@ struct CashFlowView: View {
     // MARK: KPI cards (docs/02 §5.3 metric set)
 
     private var kpiGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: FinmateSpacing.md) {
-            KPICard(title: "Monthly Income", value: store.monthlyIncome.formatted(),
-                    symbol: "arrow.down.circle.fill", tint: FinmateColor.up)
-            KPICard(title: "Monthly Expenses", value: store.monthlyExpenses.formatted(),
-                    symbol: "arrow.up.circle.fill", tint: FinmateColor.bronze)
-            KPICard(title: "Net", value: store.net.formatted(),
-                    symbol: "equal.circle.fill", tint: store.metrics.netMinor >= 0 ? FinmateColor.bronze : FinmateColor.down)
-            KPICard(title: "Savings rate", value: savingsRateText,
-                    symbol: "percent", tint: store.metrics.savingsRate >= 0 ? FinmateColor.up : FinmateColor.down)
+        // Group the four KPI tiles in one GlassEffectContainer so iOS 26 blends the
+        // glass surfaces of the cluster (no-op container ≤25). The values carry
+        // `.contentTransition(.numericText())`; the spring below animates the figure
+        // morph + sign-tint when the display currency or underlying data changes.
+        FinmateGlassGroup(spacing: FinmateSpacing.md) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: FinmateSpacing.md) {
+                KPICard(title: "Monthly Income", value: store.monthlyIncome.formatted(),
+                        symbol: "arrow.down.circle.fill", tint: FinmateColor.up)
+                KPICard(title: "Monthly Expenses", value: store.monthlyExpenses.formatted(),
+                        symbol: "arrow.up.circle.fill", tint: FinmateColor.bronze)
+                KPICard(title: "Net", value: store.net.formatted(),
+                        symbol: "equal.circle.fill", tint: store.metrics.netMinor >= 0 ? FinmateColor.bronze : FinmateColor.down)
+                KPICard(title: "Savings rate", value: savingsRateText,
+                        symbol: "percent", tint: store.metrics.savingsRate >= 0 ? FinmateColor.up : FinmateColor.down)
+            }
         }
+        // Subtle value-change transition: animate the KPI figures when the display
+        // currency switches (Settings) or the data reloads. Reduce-motion-gated.
+        .animation(reduceMotion ? nil : FinmateMotion.baseEase, value: store.displayCurrency)
+        .animation(reduceMotion ? nil : FinmateMotion.baseEase, value: store.metrics.netMinor)
     }
 
     private var savingsRateText: String {
@@ -453,9 +464,11 @@ struct CashFlowView: View {
                         edit: { editingIncome = item },
                         delete: { Task { await store.deleteIncome(id: item.id) } }
                     )
+                    .transition(.finmateRow)
                 }
             }
         }
+        .animation(reduceMotion ? nil : FinmateMotion.glassSpring, value: store.income.map(\.id))
     }
 
     // MARK: Editable Fixed-expense section
@@ -479,9 +492,11 @@ struct CashFlowView: View {
                         edit: { editingFixed = item },
                         delete: { Task { await store.deleteFixed(id: item.id) } }
                     )
+                    .transition(.finmateRow)
                 }
             }
         }
+        .animation(reduceMotion ? nil : FinmateMotion.glassSpring, value: store.fixedExpenses.map(\.id))
     }
 
     // MARK: Editable Variable-expense section
@@ -505,9 +520,11 @@ struct CashFlowView: View {
                         edit: { editingVariable = item },
                         delete: { Task { await store.deleteVariable(id: item.id) } }
                     )
+                    .transition(.finmateRow)
                 }
             }
         }
+        .animation(reduceMotion ? nil : FinmateMotion.glassSpring, value: store.variableExpenses.map(\.id))
     }
 
     // MARK: Section building blocks (shared layout for the three editable lists)

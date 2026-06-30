@@ -114,6 +114,7 @@ struct SubscriptionsListView: View {
     @State private var showingAdd = false
     @State private var showingAnalytics = false
     @State private var converter = CurrencyConverter(rates: AssetsSampleData.sampleRates)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -211,6 +212,9 @@ struct SubscriptionsListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        // Animate row insert/remove (add + swipe-delete) with the glass spring,
+        // keyed on the row identities. Reduce-motion-gated.
+        .animation(reduceMotion ? nil : FinmateMotion.glassSpring, value: store.subscriptions.map(\.id))
     }
 }
 
